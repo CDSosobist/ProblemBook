@@ -119,6 +119,11 @@ python3 server/manage.py role petrov --role editor
 python3 server/manage.py deluser petrov
 python3 server/manage.py list
 python3 server/manage.py audit --limit 40
+python3 server/manage.py status                    # сколько проблем, приоритеты, версия, просроченные
+python3 server/manage.py import-file <файл.json>   # загрузить реестр из файла (со снимком)
+python3 server/manage.py import-file <файл.json> --merge    # добавить к текущим
+python3 server/manage.py import-file <файл.json> --dry-run  # только проверить файл
+python3 server/manage.py export <файл.json>        # выгрузить реестр
 ```
 
 ### Как системный сервис

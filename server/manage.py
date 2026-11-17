@@ -14,7 +14,9 @@
 editor (чтение и правка), viewer (только чтение).
 """
 import argparse
+import datetime
 import getpass
+import json
 import os
 import sys
 
@@ -65,6 +67,17 @@ def main(argv=None):
     audit = sub.add_parser("audit", help="журнал изменений")
     audit.add_argument("--limit", type=int, default=20)
 
+    status = sub.add_parser("status", help="состояние реестра")
+    status.add_argument("--json", action="store_true", help="вывести машинно-читаемо")
+
+    export = sub.add_parser("export", help="выгрузить реестр в файл")
+    export.add_argument("path")
+
+    import_file = sub.add_parser("import-file", help="загрузить реестр из JSON-файла")
+    import_file.add_argument("path")
+    import_file.add_argument("--dry-run", action="store_true", help="только проверить файл")
+    import_file.add_argument("--merge", action="store_true", help="добавить к текущим проблемам")
+
     args = parser.parse_args(argv)
     pb_core.init_db(args.db)
 
@@ -93,6 +106,81 @@ def main(argv=None):
         elif args.command == "audit":
             for entry in pb_core.audit_log(args.db, args.limit):
                 print("%-19s %-12s %-14s %s" % (entry["ts"], entry["actor"], entry["action"], entry["details"]))
+        elif args.command == "status":
+            data = pb_core.get_register(args.db)
+            items = data["items"]
+            by_prio = {}
+            by_status = {}
+            overdue = 0
+            today = datetime.date.today().isoformat()
+            for item in items:
+                by_prio[item.get("priority", "?")] = by_prio.get(item.get("priority", "?"), 0) + 1
+                by_status[item.get("status", "?")] = by_status.get(item.get("status", "?"), 0) + 1
+                if item.get("due") and item.get("due") < today and item.get("status") not in ("done", "rejected"):
+                    overdue += 1
+            summary = {
+                "revision": data["revision"],
+                "items": len(items),
+                "byPriority": by_prio,
+                "byStatus": by_status,
+                "overdue": overdue,
+                "updatedAt": data["updatedAt"],
+                "updatedBy": data["updatedBy"],
+                "users": len(pb_core.list_users(args.db)),
+                "backups": len(pb_core.backups(os.path.join(os.path.dirname(os.path.abspath(args.db)), "backups"))),
+            }
+            if args.json:
+                print(json.dumps(summary, ensure_ascii=False, indent=2))
+            else:
+                print("проблем: %d (версия реестра %d)" % (summary["items"], summary["revision"]))
+                print("приоритеты: %s" % ", ".join("%s=%d" % kv for kv in sorted(summary["byPriority"].items())))
+                print("статусы: %s" % ", ".join("%s=%d" % kv for kv in sorted(summary["byStatus"].items())))
+                print("просрочено: %d" % summary["overdue"])
+                print("последнее изменение: %s (%s)" % (summary["updatedAt"], summary["updatedBy"]))
+                print("пользователей: %d, снимков: %d" % (summary["users"], summary["backups"]))
+        elif args.command == "export":
+            data = pb_core.get_register(args.db)
+            payload = {"app": "problembook", "version": 1, "exportedAt": pb_core.now_iso(),
+                       "items": data["items"]}
+            with open(args.path, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, ensure_ascii=False, indent=2)
+            print("выгружено %d проблем в %s" % (len(data["items"]), args.path))
+        elif args.command == "import-file":
+            with open(args.path, encoding="utf-8") as handle:
+                payload = json.load(handle)
+            incoming = payload.get("items") if isinstance(payload, dict) else payload
+            if not isinstance(incoming, list) or not incoming:
+                raise SystemExit("в файле нет записей: ожидался JSON с полем items")
+            incoming = pb_core.validate_items(incoming)
+
+            current = pb_core.get_register(args.db)["items"]
+            if args.merge and current:
+                start = len(current)
+                used = set()
+                for item in current:
+                    used.add(item.get("id"))
+                for index, item in enumerate(incoming):
+                    candidate = "PB-%d" % (start + index + 1)
+                    if candidate in used:
+                        candidate = "PB-%d-%s" % (start + index + 1, datetime.datetime.now().strftime("%H%M%S"))
+                    item["id"] = candidate
+                incoming = current + incoming
+
+            by_prio = {}
+            for item in incoming:
+                by_prio[item["priority"]] = by_prio.get(item["priority"], 0) + 1
+            summary = ", ".join("%s=%d" % kv for kv in sorted(by_prio.items()))
+            if args.dry_run:
+                print("проверка пройдена: %d проблем (%s), запись не выполнялась" % (len(incoming), summary))
+                return 0
+
+            backup_dir = os.path.join(os.path.dirname(os.path.abspath(args.db)), "backups")
+            snapshot = pb_core.snapshot(args.db, backup_dir)
+            revision = pb_core.save_register(args.db, incoming, "cli", force=True, action="cli-import")
+            with pb_core.connect(args.db) as conn:
+                pb_core.audit(conn, "cli", "cli-import-backup", os.path.basename(snapshot))
+            print("загружено %d проблем (%s), реестр стал версией %d" % (len(incoming), summary, revision))
+            print("снимок предыдущего состояния: %s" % snapshot)
     except pb_core.ValidationError as exc:
         raise SystemExit("ошибка: %s" % exc)
     return 0
