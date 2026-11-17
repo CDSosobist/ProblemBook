@@ -34,6 +34,8 @@ DEFAULT_DB = os.path.join(ROOT, "data", "problems.db")
 DEFAULT_CERTS = os.path.join(ROOT, "certs")
 
 COOKIE_NAME = "pb_sid"
+HANDSHAKE_TIMEOUT = 15     # секунд на TLS-рукопожатие
+REQUEST_TIMEOUT = 65       # секунд на чтение запроса от клиента
 MAX_BODY = 32 * 1024 * 1024
 LOGIN_WINDOW = 300
 LOGIN_MAX_FAILS = 6
@@ -108,6 +110,20 @@ def ensure_certificate(cert_dir, common_name="problembook"):
 class Handler(BaseHTTPRequestHandler):
     server_version = "ProblemBook"
     protocol_version = "HTTP/1.1"
+    timeout = REQUEST_TIMEOUT
+
+    def setup(self):
+        """TLS-рукопожатие выполняется в потоке обработки запроса.
+
+        Если рукопожатие делать в цикле accept (обернув слушающий сокет),
+        одно зависшее соединение блокирует весь сервер: очередь accept
+        заполняется, новые клиенты ждут таймаута. Ровно так сервер и встал.
+        """
+        context = getattr(self.server, "tls_context", None)
+        if context is not None:
+            self.request.settimeout(HANDSHAKE_TIMEOUT)
+            self.request = context.wrap_socket(self.request, server_side=True)
+        super().setup()
 
     # ------------------------------------------------------------ служебное
 
@@ -392,7 +408,16 @@ class Handler(BaseHTTPRequestHandler):
 class Server(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
+    request_queue_size = 32
     tls = False
+    tls_context = None
+
+    def handle_error(self, request, client_address):
+        exc = sys.exc_info()[1]
+        if isinstance(exc, (ssl.SSLError, TimeoutError, ConnectionError, ConnectionAbortedError)):
+            self.log_message("соединение от %s прервано: %s", client_address, exc)
+            return
+        super().handle_error(request, client_address)
 
 
 def build_server(args):
@@ -407,7 +432,8 @@ def build_server(args):
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context.minimum_version = ssl.TLSVersion.TLSv1_2
         context.load_cert_chain(certfile=cert, keyfile=key)
-        httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
+        # важно: контекст отдаём обработчику, слушающий сокет НЕ оборачиваем
+        httpd.tls_context = context
         httpd.tls = True
     return httpd
 

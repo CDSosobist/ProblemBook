@@ -320,6 +320,17 @@ def main():
                 status, payload, _ = Client(tls_base, verify=False).json('GET', '/api/session')
                 check('HTTPS отвечает', status == 200, str(status))
 
+                # регрессия: соединение без TLS-рукопожатия не должно блокировать сервер
+                stalled = socket.create_connection(('127.0.0.1', tls_port), timeout=5)
+                try:
+                    t0 = time.time()
+                    status, payload, _ = Client(tls_base, verify=False).json('GET', '/api/session')
+                    elapsed = time.time() - t0
+                    check('зависшее соединение не блокирует сервер',
+                          status == 200 and elapsed < 5, '%s за %.1f с' % (status, elapsed))
+                finally:
+                    stalled.close()
+
                 cafile = os.path.join(certs, 'cert.pem')
                 trusted = ssl.create_default_context(cafile=cafile)
                 with socket.create_connection(('127.0.0.1', tls_port), timeout=10) as sock:
