@@ -3,5 +3,6 @@
 .shot-*.html
 .shots/
 .smoke.log
+imports/
 __pycache__/
 *.pyc
