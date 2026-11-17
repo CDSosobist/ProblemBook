@@ -2,7 +2,7 @@
 
 Проблембук для ИТ-директора: единый список того, что сломано или опасно в инфраструктуре, чем это грозит, что нужно сделать, чем рискуем при починке, с каким приоритетом и в каком статусе.
 
-Репозиторий: [github.com/CDSosobist/ProblemBook](https://github.com/CDSosobist/ProblemBook)
+Репозиторий: [github.com/CDSosobist/ProblemBook](https://github.com/CDSosobist/ProblemBook) · Живая версия: [cdsosobist.github.io/ProblemBook](https://cdsosobist.github.io/ProblemBook/)
 
 Статический сайт без зависимостей и сборки: открывается двойным щелчком по `index.html` или раздаётся любым веб-сервером. Данные живут в браузере (localStorage), выгружаются в JSON/CSV.
 
@@ -25,7 +25,7 @@ xdg-open index.html
 ./serve.sh 9000     # другой порт
 ```
 
-**Публикация на GitHub Pages** — Settings → Pages → Source «Deploy from a branch» → ветка `main`, папка `/ (root)`. После первого билда сайт доступен по `https://cdsosobist.github.io/ProblemBook/`.
+**Публикация на GitHub Pages** включена: Source «Deploy from a branch», ветка `main`, папка `/ (root)`. Любой пуш в `main` пересобирает сайт за минуту — живая версия `https://cdsosobist.github.io/ProblemBook/`.
 
 Репозиторий публичный намеренно: бесплатный GitHub Pages работает только для публичных репозиториев. Секретов, доступов и внутренних адресов в коде нет — реестр проблем хранится в браузере пользователя, а не в репозитории.
 
