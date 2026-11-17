@@ -4,5 +4,10 @@
 .shots/
 .smoke.log
 imports/
+data/
+certs/
+*.db
+*.db-wal
+*.db-shm
 __pycache__/
 *.pyc
