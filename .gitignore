@@ -1,0 +1,7 @@
+# временные артефакты тестов и скриншотов
+.selftest.html
+.shot-*.html
+.shots/
+.smoke.log
+__pycache__/
+*.pyc
