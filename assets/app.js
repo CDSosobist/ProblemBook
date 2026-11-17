@@ -172,6 +172,12 @@
 
   /* ---------------------------------------------------------------- стейт */
 
+  var MODE = 'local';
+  var server = {
+    user: null, csrf: null, revision: 0, timer: null,
+    conflict: null, poll: null, loaded: false
+  };
+
   var state = {
     items: [],
     seq: 0,
@@ -190,22 +196,27 @@
 
   /* --------------------------------------------------- хранилище / бэкапы */
 
-  function load() {
+  function readStore() {
     var raw = null;
     try {
       raw = localStorage.getItem(STORE_KEY);
     } catch (e) {
-      return;
+      return null;
     }
-    if (!raw) {
-      var prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
-      state.ui.theme = prefersLight ? 'light' : 'dark';
-      return;
-    }
+    if (!raw) return null;
     try {
-      var data = JSON.parse(raw);
-      var items = Array.isArray(data) ? data : (data && data.items) || [];
-      state.items = items.map(normalizeItem);
+      return JSON.parse(raw);
+    } catch (e) {
+      banner('Локальные данные повреждены и не были загружены. Импортируйте JSON-бэкап.');
+      return null;
+    }
+  }
+
+  function loadUI() {
+    var prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+    state.ui.theme = prefersLight ? 'light' : 'dark';
+    var data = readStore();
+    try {
       if (data && data.ui && typeof data.ui === 'object') {
         var ui = data.ui;
         if (ui.view === 'table' || ui.view === 'board') state.ui.view = ui.view;
@@ -223,8 +234,15 @@
       }
     } catch (e) {
       console.warn('ProblemBook: не удалось прочитать локальные данные', e);
-      banner('Локальные данные повреждены и не были загружены. Импортируйте JSON-бэкап.');
     }
+  }
+
+  function load() {
+    loadUI();
+    var data = readStore();
+    if (!data && localStorage.getItem(STORE_KEY)) return;
+    var items = Array.isArray(data) ? data : (data && data.items) || [];
+    state.items = items.map(normalizeItem);
   }
 
   function save() {
@@ -239,6 +257,250 @@
     } catch (e) {
       banner('Не удалось сохранить данные в браузере (хранилище переполнено или недоступно). Экспортируйте JSON.');
     }
+    if (MODE === 'server') scheduleSync();
+  }
+
+  /* --------------------------------------------------- серверный режим */
+
+  function apiCall(path, options) {
+    options = options || {};
+    var headers = options.headers || {};
+    headers['Accept'] = 'application/json';
+    if (options.body) headers['Content-Type'] = 'application/json';
+    if (server.csrf) headers['X-CSRF-Token'] = server.csrf;
+    return fetch(path, {
+      method: options.method || 'GET',
+      headers: headers,
+      body: options.body,
+      credentials: 'same-origin',
+      cache: 'no-store'
+    }).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (data) {
+        if (response.ok) return data;
+        var error = new Error((data && data.error) || ('HTTP ' + response.status));
+        error.status = response.status;
+        error.data = data || {};
+        throw error;
+      });
+    });
+  }
+
+  function canWrite() {
+    if (MODE !== 'server') return true;
+    return !!(server.user && server.user.role !== 'viewer');
+  }
+
+  function detectMode() {
+    var canProbe = window.fetch && /^https?:$/.test(location.protocol);
+    if (!canProbe) { startLocal(); return; }
+    apiCall('api/session').then(function (data) {
+      if (!data || typeof data.authenticated !== 'boolean') throw new Error('no-api');
+      enterServerMode(data);
+    }).catch(function () {
+      startLocal();
+    });
+  }
+
+  function startLocal() {
+    MODE = 'local';
+    load();
+    applyTheme();
+    renderAll();
+  }
+
+  function enterServerMode(data) {
+    MODE = 'server';
+    document.body.classList.add('mode-server');
+    loadUI();
+    applyTheme();
+    if (!data.authenticated) { showLogin(); renderAll(); return; }
+    server.user = data.user;
+    server.csrf = data.csrf;
+    onAuthenticated();
+  }
+
+  function onAuthenticated() {
+    if (el.storageNote) {
+      el.storageNote.textContent = 'ProblemBook · реестр проблем ИТ-инфраструктуры · общий реестр на сервере';
+    }
+    var readonly = server.user.role === 'viewer';
+    document.body.classList.toggle('is-readonly', readonly);
+    renderUserChip();
+    hideLogin();
+    serverLoad();
+  }
+
+  function renderUserChip() {
+    if (!el.userChip) return;
+    if (MODE !== 'server' || !server.user) { el.userChip.hidden = true; return; }
+    el.userChip.hidden = false;
+    el.userName.textContent = server.user.name;
+    el.userRole.textContent = server.user.roleTitle || server.user.role;
+    el.userInitial.textContent = initials(server.user.name);
+  }
+
+  function serverLoad() {
+    apiCall('api/state').then(function (data) {
+      state.items = (data.items || []).map(normalizeItem);
+      server.revision = data.revision;
+      server.loaded = true;
+      server.conflict = null;
+      hideConflict();
+      save();
+      renderAll();
+      setSyncStatus('ok');
+      startPolling();
+      if (!state.items.length) return;
+    }).catch(function (error) {
+      if (error.status === 401) { server.user = null; showLogin(); return; }
+      banner('Не удалось загрузить реестр с сервера: ' + error.message);
+    });
+  }
+
+  function scheduleSync() {
+    if (MODE !== 'server' || !server.loaded || !canWrite()) return;
+    if (server.conflict) return;
+    server.pending = true;
+    setSyncStatus('syncing');
+    clearTimeout(server.timer);
+    server.timer = setTimeout(function () { syncNow(false); }, 700);
+  }
+
+  function syncNow(force) {
+    if (MODE !== 'server') return;
+    clearTimeout(server.timer);
+    setSyncStatus('syncing');
+    return apiCall('api/state', {
+      method: 'PUT',
+      body: JSON.stringify({ revision: server.revision, items: state.items, force: !!force })
+    }).then(function (data) {
+      server.revision = data.revision;
+      server.pending = false;
+      server.conflict = null;
+      hideConflict();
+      setSyncStatus('ok');
+    }).catch(function (error) {
+      server.pending = false;
+      if (error.status === 409) {
+        server.conflict = error.data || {};
+        showConflict(server.conflict);
+        setSyncStatus('conflict');
+        return;
+      }
+      if (error.status === 401) { server.user = null; showLogin(); return; }
+      setSyncStatus('error', error.message);
+      toast('Не удалось сохранить на сервере: ' + error.message, 'danger');
+    });
+  }
+
+  function setSyncStatus(kind, message) {
+    if (!el.syncChip) return;
+    if (MODE !== 'server') { el.syncChip.hidden = true; return; }
+    el.syncChip.hidden = false;
+    el.syncChip.className = 'sync-chip is-' + kind;
+    var text = {
+      syncing: 'сохраняю…',
+      ok: 'сохранено на сервере',
+      conflict: 'конфликт версий',
+      error: 'ошибка сохранения'
+    }[kind] || kind;
+    el.syncChip.textContent = message ? text + ': ' + message : text;
+    el.syncChip.title = 'Версия реестра: ' + server.revision;
+  }
+
+  function showConflict(meta) {
+    if (!el.serverBanner) return;
+    el.serverBanner.hidden = false;
+    el.serverBanner.className = 'server-banner is-warning';
+    el.serverBanner.innerHTML = '<div class="server-banner-text">Реестр изменён другим пользователем' +
+      (meta && meta.updatedBy ? ' (' + esc(meta.updatedBy) + ')' : '') +
+      '. Ваши правки ещё не сохранены — загрузите свежую версию или сохраните поверх.</div>' +
+      '<div class="server-banner-actions">' +
+      '<button class="btn btn-sm" type="button" data-banner="reload">Загрузить с сервера</button>' +
+      '<button class="btn btn-sm btn-danger" type="button" data-banner="force">Сохранить поверх</button>' +
+      '</div>';
+  }
+
+  function showUpdateNotice() {
+    if (!el.serverBanner) return;
+    el.serverBanner.hidden = false;
+    el.serverBanner.className = 'server-banner';
+    el.serverBanner.innerHTML = '<div class="server-banner-text">На сервере есть более свежая версия реестра.</div>' +
+      '<div class="server-banner-actions">' +
+      '<button class="btn btn-sm" type="button" data-banner="apply">Обновить</button>' +
+      '</div>';
+  }
+
+  function hideConflict() {
+    if (!el.serverBanner) return;
+    el.serverBanner.hidden = true;
+    el.serverBanner.innerHTML = '';
+  }
+
+  function startPolling() {
+    stopPolling();
+    if (MODE !== 'server') return;
+    server.poll = setInterval(function () {
+      if (document.hidden || server.pending || server.conflict) return;
+      apiCall('api/state').then(function (data) {
+        if (data.revision !== server.revision) showUpdateNotice();
+      }).catch(function () { /* тихо: следующий цикл */ });
+    }, 45000);
+  }
+
+  function stopPolling() {
+    if (server.poll) { clearInterval(server.poll); server.poll = null; }
+  }
+
+  function showLogin() {
+    if (!el.loginLayer) return;
+    stopPolling();
+    el.loginLayer.hidden = false;
+    document.body.classList.add('no-scroll');
+    if (el.loginName) setTimeout(function () { el.loginName.focus(); }, 60);
+  }
+
+  function hideLogin() {
+    if (!el.loginLayer) return;
+    el.loginLayer.hidden = true;
+    document.body.classList.remove('no-scroll');
+  }
+
+  function loginError(message) {
+    if (!el.loginError) return;
+    el.loginError.hidden = !message;
+    el.loginError.textContent = message || '';
+  }
+
+  function submitLogin(event) {
+    if (event) event.preventDefault();
+    var name = (el.loginName.value || '').trim();
+    var password = el.loginPassword.value || '';
+    if (!name || !password) { loginError('Введите логин и пароль'); return; }
+    el.loginSubmit.disabled = true;
+    loginError('');
+    apiCall('api/login', { method: 'POST', body: JSON.stringify({ name: name, password: password }) })
+      .then(function (data) {
+        server.user = data.user;
+        server.csrf = data.csrf;
+        el.loginPassword.value = '';
+        onAuthenticated();
+      })
+      .catch(function (error) {
+        loginError(error.message || 'Не удалось войти');
+        el.loginPassword.select();
+      })
+      .then(function () { el.loginSubmit.disabled = false; });
+  }
+
+  function logout() {
+    apiCall('api/logout', { method: 'POST' }).catch(function () { /* всё равно уходим */ })
+      .then(function () {
+        server.user = null;
+        server.csrf = null;
+        stopPolling();
+        location.reload();
+      });
   }
 
   function pushHistory(item, text) {
@@ -284,6 +546,20 @@
     el.itemForm = $('#itemForm');
     el.toasts = $('#toasts');
     el.themeIcon = $('#themeIcon');
+    el.loginLayer = $('#loginLayer');
+    el.loginForm = $('#loginForm');
+    el.loginName = $('#loginName');
+    el.loginPassword = $('#loginPassword');
+    el.loginError = $('#loginError');
+    el.loginSubmit = $('#loginSubmit');
+    el.userChip = $('#userChip');
+    el.userName = $('#userName');
+    el.userRole = $('#userRole');
+    el.userInitial = $('#userInitial');
+    el.logoutBtn = $('#logoutBtn');
+    el.syncChip = $('#syncChip');
+    el.storageNote = $('#storageNote');
+    el.serverBanner = $('#serverBanner');
   }
 
   function renderAll() {
@@ -608,6 +884,7 @@
           : '<div class="history-item">Записей пока нет</div>') + '</div></div>';
 
     var statusSelect = $('#drawerStatus', el.drawerBody);
+    if (statusSelect && !canWrite()) statusSelect.disabled = true;
     if (statusSelect) {
       statusSelect.addEventListener('change', function () {
         updateItem(item.id, { status: statusSelect.value, _historyText: 'Статус → ' + statusOf(statusSelect.value).label });
@@ -623,6 +900,7 @@
   /* ------------------------------------------------------------------ CRUD */
 
   function createItem(data) {
+    if (!canWrite()) return null;
     var item = normalizeItem(data);
     item.id = nextId();
     item.createdAt = isoNow();
@@ -635,6 +913,7 @@
   }
 
   function updateItem(id, patch, silent) {
+    if (!canWrite()) return;
     var item = findItem(id);
     if (!item) return;
     var statusChanged = !!patch.status && patch.status !== item.status;
@@ -654,6 +933,7 @@
   }
 
   function toggleAction(id, idx, checked) {
+    if (!canWrite()) return;
     var item = findItem(id);
     if (!item) return;
     var done = item.done.indexOf(idx);
@@ -665,6 +945,7 @@
   }
 
   function deleteItem(id) {
+    if (!canWrite()) return;
     var idx = state.items.findIndex(function (i) { return i.id === id; });
     if (idx < 0) return;
     if (!window.confirm('Удалить проблему ' + id + '? Это действие можно отменить кнопкой «Отменить» в уведомлении.')) return;
@@ -686,6 +967,7 @@
   }
 
   function duplicateItem(id) {
+    if (!canWrite()) return;
     var src = findItem(id);
     if (!src) return;
     var copy = JSON.parse(JSON.stringify(src));
@@ -741,6 +1023,7 @@
   }
 
   function openForm(item) {
+    if (!canWrite()) { toast('Роль «только чтение»: изменения недоступны', 'danger'); return; }
     state.formMode = item ? 'edit' : 'create';
     state.editingId = item ? item.id : null;
     el.modalTitle.textContent = item ? 'Редактировать ' + item.id : 'Новая проблема';
@@ -907,6 +1190,7 @@
         toast('В файле нет записей проблем', 'danger');
         return;
       }
+      if (MODE === 'server') { serverImport(items); return; }
       var incoming = items.map(normalizeItem);
       var msg = 'Импорт заменит текущий реестр (' + state.items.length + ' записей) на ' + incoming.length +
         ' записей из файла.\n\nТекущие данные сохранятся как резервная копия в браузере (кнопка «Отменить» не сработает — сделайте экспорт, если сомневаетесь).\n\nПродолжить?';
@@ -927,7 +1211,22 @@
     reader.readAsText(file);
   }
 
+  function serverImport(items) {
+    if (!canWrite()) { toast('Роль «только чтение»: импорт недоступен', 'danger'); return; }
+    if (!window.confirm('Импорт заменит общий реестр на сервере (' + items.length + ' записей).\n\nПродолжить?')) return;
+    apiCall('api/import', { method: 'POST', body: JSON.stringify({ items: items }) })
+      .then(function (data) {
+        toast('Импортировано на сервер: ' + data.count + ' записей', 'ok');
+        serverLoad();
+        closeDrawer();
+      })
+      .catch(function (error) {
+        toast('Импорт не выполнен: ' + error.message, 'danger');
+      });
+  }
+
   function clearAll() {
+    if (!canWrite()) { toast('Роль «только чтение»: изменения недоступны', 'danger'); return; }
     if (!state.items.length) { toast('Реестр уже пуст'); return; }
     if (!window.confirm('Удалить все ' + state.items.length + ' записей? Резервная копия останется в браузере, но лучше сделать экспорт JSON.')) return;
     try { localStorage.setItem(BACKUP_KEY, JSON.stringify({ savedAt: isoNow(), items: state.items })); } catch (e) { /* ignore */ }
@@ -1244,6 +1543,7 @@
 
     var dragId = null;
     el.board.addEventListener('dragstart', function (event) {
+      if (!canWrite()) { event.preventDefault(); return; }
       var card = event.target.closest('[data-drag-id]');
       if (!card) return;
       dragId = card.getAttribute('data-drag-id');
@@ -1330,6 +1630,19 @@
     });
     $('#clearBtn').addEventListener('click', clearAll);
 
+    /* серверный режим: вход, выход, баннеры */
+    if (el.loginForm) el.loginForm.addEventListener('submit', submitLogin);
+    if (el.logoutBtn) el.logoutBtn.addEventListener('click', logout);
+    if (el.serverBanner) {
+      el.serverBanner.addEventListener('click', function (event) {
+        var btn = event.target.closest('[data-banner]');
+        if (!btn) return;
+        var action = btn.getAttribute('data-banner');
+        if (action === 'reload' || action === 'apply') { hideConflict(); serverLoad(); }
+        if (action === 'force') { server.conflict = null; hideConflict(); syncNow(true); }
+      });
+    }
+
     /* тема */
     $('#themeToggle').addEventListener('click', function () {
       state.ui.theme = state.ui.theme === 'dark' ? 'light' : 'dark';
@@ -1385,7 +1698,6 @@
 
   function init() {
     cacheEls();
-    load();
     applyTheme();
     initFormSelects();
     bindEvents();
@@ -1395,7 +1707,14 @@
       console.error(event.error || event.message);
     });
 
-    renderAll();
+    window.addEventListener('beforeunload', function (event) {
+      if (MODE === 'server' && (server.pending || server.conflict)) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    });
+
+    detectMode();
   }
 
   if (document.readyState === 'loading') {

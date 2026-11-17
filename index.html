@@ -32,6 +32,13 @@
     </div>
 
     <div class="topbar-actions">
+      <div class="user-chip" id="userChip" hidden>
+        <span class="avatar" id="userInitial">·</span>
+        <span class="user-meta"><strong id="userName">—</strong><small id="userRole"></small></span>
+        <button class="icon-btn icon-btn-sm" id="logoutBtn" type="button" title="Выйти" aria-label="Выйти">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 17l5-5-5-5M20 12H9M12 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6"></path></svg>
+        </button>
+      </div>
       <button class="icon-btn" id="themeToggle" type="button" title="Сменить тему" aria-label="Сменить тему">
         <svg id="themeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="4"></circle>
@@ -88,6 +95,8 @@
     <!-- ---------------------------- MAIN ----------------------------- -->
     <main class="main">
 
+      <div class="server-banner" id="serverBanner" hidden></div>
+
       <section class="kpis" aria-label="Сводка">
         <div class="kpi" style="--kpi-accent: var(--accent-2)">
           <span class="kpi-label">Открытых проблем</span>
@@ -137,6 +146,7 @@
         </select>
 
         <span class="count-badge" id="countBadge">0 записей</span>
+        <span class="sync-chip" id="syncChip" hidden></span>
         <div class="spacer"></div>
 
         <button class="btn btn-sm btn-ghost" id="exportJson" type="button" title="Скачать бэкап в JSON">Экспорт JSON</button>
@@ -190,7 +200,7 @@
       </svg>
       github.com/CDSosobist
     </a>
-    <span>ProblemBook · реестр проблем ИТ-инфраструктуры · данные хранятся локально</span>
+    <span id="storageNote">ProblemBook · реестр проблем ИТ-инфраструктуры · данные хранятся локально</span>
     <span class="spacer"></span>
     <span>Горячие клавиши: <code>Ctrl K</code> — поиск · <code>N</code> — новая · <code>Esc</code> — закрыть</span>
   </footer>
@@ -298,6 +308,26 @@
       </div>
     </form>
   </div>
+</div>
+
+<div class="login-layer" id="loginLayer" hidden>
+  <form class="login-card" id="loginForm" novalidate>
+    <div class="login-brand">
+      <span class="brand-mark">PB</span>
+      <span class="brand-text"><strong>ProblemBook</strong><small>Реестр проблем ИТ-инфраструктуры</small></span>
+    </div>
+    <label class="field">
+      <span>Логин</span>
+      <input id="loginName" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" required>
+    </label>
+    <label class="field">
+      <span>Пароль</span>
+      <input id="loginPassword" type="password" autocomplete="current-password" required>
+    </label>
+    <div class="login-error" id="loginError" hidden></div>
+    <button class="btn btn-primary btn-block" type="submit" id="loginSubmit">Войти</button>
+    <p class="login-hint">Доступ только из внутренней сети. Учётные записи выдаёт администратор проблембука.</p>
+  </form>
 </div>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
