@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>ProblemBook — тест серверного режима</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 16px; background: #0b0f16; color: #e8eefb; }
+  iframe { width: 1280px; height: 720px; border: 1px solid #2a3444; border-radius: 8px; background: #fff; margin-top: 12px; }
+  #log { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+<p>Прогон интерфейса в серверном режиме (логин, синхронизация, роли). Результаты — в консоли браузера.</p>
+<iframe id="frame" src="about:blank" title="ProblemBook"></iframe>
+<pre id="log"></pre>
+<script>
+(function () {
+  'use strict';
+  var out = [];
+  var csrf = null;
+
+  function say(line) {
+    out.push(line);
+    console.log('[S] ' + line);
+    document.getElementById('log').textContent = out.join('\n');
+  }
+  function ok(name, cond, extra) {
+    say((cond ? 'PASS ' : 'FAIL ') + name + (extra === undefined ? '' : ' :: ' + extra));
+  }
+  function fails() { return out.filter(function (l) { return l.indexOf('FAIL') === 0; }).length; }
+  function finish() {
+    console.log('[S] ИТОГ: ' + (out.length - fails()) + ' PASS, ' + fails() + ' FAIL');
+    console.log('SERVER_UI_DONE');
+  }
+
+  function api(path, options) {
+    options = options || {};
+    var headers = { 'Accept': 'application/json' };
+    if (options.body) headers['Content-Type'] = 'application/json';
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+    return fetch(path, {
+      method: options.method || 'GET',
+      headers: headers,
+      body: options.body,
+      credentials: 'same-origin',
+      cache: 'no-store'
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        if (r.ok) return data;
+        var error = new Error((data && data.error) || ('HTTP ' + r.status));
+        error.status = r.status;
+        throw error;
+      });
+    });
+  }
+
+  function login(name, password) {
+    csrf = null;
+    return api('/api/login', { method: 'POST', body: JSON.stringify({ name: name, password: password }) })
+      .then(function (data) {
+        csrf = data.csrf;
+        return data;
+      });
+  }
+
+  function loadFrame() {
+    return new Promise(function (resolve, reject) {
+      var frame = document.getElementById('frame');
+      var done = false;
+      var timer = setTimeout(function () {
+        if (!done) reject(new Error('iframe: таймаут загрузки'));
+      }, 20000);
+      frame.onload = function () {
+        setTimeout(function () {
+          done = true;
+          clearTimeout(timer);
+          resolve(frame);
+        }, 1200);
+      };
+      frame.src = '/?_=' + Date.now();
+    });
+  }
+
+  function check(name, condition, extra) {
+    ok(name, !!condition, extra);
+  }
+
+  async function run() {
+    var frame, doc, win;
+
+    /* --- сценарий 1: администратор --- */
+    var session = await api('/api/session');
+    check('до входа сессия анонимна', session.authenticated === false, JSON.stringify(session));
+
+    try {
+      await login('admin', 'wrong-password');
+      check('неверный пароль не пускает', false, 'вход прошёл');
+    } catch (error) {
+      check('неверный пароль не пускает', error.status === 401, error.status);
+    }
+
+    var admin = await login('testadmin', 'adminpassword1');
+    check('вход администратора', admin.user && admin.user.role === 'admin', JSON.stringify(admin.user));
+
+    frame = await loadFrame();
+    doc = frame.contentDocument;
+    win = frame.contentWindow;
+
+    check('страница проблембука загрузилась', /ProblemBook/.test(doc.title), doc.title);
+    check('нет ошибки на странице', doc.getElementById('errBanner').hidden,
+          doc.getElementById('errBanner').textContent);
+    check('реестр загружен с сервера: 3 строки',
+          doc.querySelectorAll('table.pb tbody tr').length === 3,
+          String(doc.querySelectorAll('table.pb tbody tr').length));
+    check('чип пользователя показан', !doc.getElementById('userChip').hidden);
+    check('имя пользователя совпадает',
+          doc.getElementById('userName').textContent === 'testadmin',
+          doc.getElementById('userName').textContent);
+    check('роль подписана', doc.getElementById('userRole').textContent.indexOf('администратор') >= 0,
+          doc.getElementById('userRole').textContent);
+    check('индикатор синхронизации: сохранено',
+          !doc.getElementById('syncChip').hidden &&
+          doc.getElementById('syncChip').textContent.indexOf('сохранено') >= 0,
+          doc.getElementById('syncChip').textContent);
+    check('вход не требуется повторно', doc.getElementById('loginLayer').hidden);
+    check('кнопка «Новая проблема» доступна (не readonly)',
+          !doc.body.classList.contains('is-readonly'));
+
+    /* создание проблемы через интерфейс и проверка на сервере */
+    doc.getElementById('newBtn').click();
+    await new Promise(function (r) { setTimeout(r, 250); });
+    check('форма создания открылась', !doc.getElementById('modalLayer').hidden);
+    var title = doc.getElementById('f-title');
+    title.value = 'Проблема из интерфейса серверного режима';
+    title.dispatchEvent(new Event('input', { bubbles: true }));
+    doc.getElementById('f-priority').value = 'P1';
+    doc.getElementById('itemForm').requestSubmit();
+    await new Promise(function (r) { setTimeout(r, 2500); });
+
+    var afterCreate = await api('/api/state');
+    var created = afterCreate.items.filter(function (i) {
+      return i.title === 'Проблема из интерфейса серверного режима';
+    }).length;
+    check('правка из интерфейса ушла на сервер', created === 1, 'найдено: ' + created);
+    check('в интерфейсе появилась строка',
+          doc.querySelectorAll('table.pb tbody tr').length === 4,
+          String(doc.querySelectorAll('table.pb tbody tr').length));
+
+    /* --- сценарий 2: только чтение --- */
+    await api('/api/logout', { method: 'POST' });
+    csrf = null;
+    var viewer = await login('testviewer', 'viewerpassword1');
+    check('вход наблюдателя', viewer.user && viewer.user.role === 'viewer', JSON.stringify(viewer.user));
+
+    frame = await loadFrame();
+    doc = frame.contentDocument;
+
+    check('наблюдатель видит реестр', doc.querySelectorAll('table.pb tbody tr').length === 4,
+          String(doc.querySelectorAll('table.pb tbody tr').length));
+    check('режим только чтения включён', doc.body.classList.contains('is-readonly'));
+    check('кнопка «Новая проблема» скрыта',
+          win.getComputedStyle(doc.getElementById('newBtn')).display === 'none',
+          win.getComputedStyle(doc.getElementById('newBtn')).display);
+
+    var firstRow = doc.querySelector('table.pb tbody tr');
+    firstRow.click();
+    await new Promise(function (r) { setTimeout(r, 300); });
+    check('карточка открывается на чтение', doc.getElementById('drawer').classList.contains('is-open'));
+    check('кнопка редактирования скрыта',
+          win.getComputedStyle(doc.getElementById('drawerEdit')).display === 'none',
+          win.getComputedStyle(doc.getElementById('drawerEdit')).display);
+    check('смена статуса заблокирована', doc.getElementById('drawerStatus').disabled === true);
+
+    finish();
+  }
+
+  run().catch(function (error) {
+    say('FAIL исключение :: ' + (error && error.stack ? error.stack : error));
+    finish();
+  });
+})();
+</script>
+</body>
+</html>
