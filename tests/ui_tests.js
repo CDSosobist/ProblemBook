@@ -73,7 +73,7 @@
     ok('KPI открытых = 0', q('#kpiOpen').textContent === '0', q('#kpiOpen').textContent);
     ok('7 статус-чипов', qa('#statusFilters .chip').length === 7, String(qa('#statusFilters .chip').length));
     ok('4 приоритет-чипа', qa('#priorityFilters .chip').length === 4, String(qa('#priorityFilters .chip').length));
-    var gh = qa('a[href*="github.com/rusbootlegger"]');
+    var gh = qa('a[href*="github.com/CDSosobist"]');
     ok('ссылка на GitHub в шапке и футере', gh.length >= 2, 'count=' + gh.length);
     ok('тема применена', !!document.documentElement.getAttribute('data-theme'));
     ok('все поля формы на месте',
