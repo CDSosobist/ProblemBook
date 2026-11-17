@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProblemBook — реестр проблем ИТ-инфраструктуры (Ubuntu)</title>
+<meta name="description" content="Проблембук ИТ-директора: проблемы Ubuntu-инфраструктуры, риски, необходимые действия, риски реализации, приоритеты, статусы и примечания.">
+<meta name="color-scheme" content="dark light">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236366f1'/%3E%3Cpath d='M9 21V11h5.4a3.4 3.4 0 0 1 0 6.8H12' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='22' cy='21' r='2' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ============================ TOPBAR ============================ -->
+  <header class="topbar">
+    <a class="brand" href="./" title="ProblemBook">
+      <span class="brand-mark">PB</span>
+      <span class="brand-text">
+        <strong>ProblemBook</strong>
+        <small>Реестр проблем ИТ-инфраструктуры · Ubuntu</small>
+      </span>
+    </a>
+
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path>
+      </svg>
+      <input id="search" type="text" placeholder="Поиск: проблема, риск, система, ответственный…" autocomplete="off" spellcheck="false" aria-label="Поиск по реестру">
+      <kbd>Ctrl K</kbd>
+    </div>
+
+    <div class="topbar-actions">
+      <button class="icon-btn" id="themeToggle" type="button" title="Сменить тему" aria-label="Сменить тему">
+        <svg id="themeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4"></circle>
+          <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
+        </svg>
+      </button>
+      <a class="icon-btn" href="https://github.com/rusbootlegger" target="_blank" rel="noopener noreferrer" title="Мой GitHub: github.com/rusbootlegger" aria-label="Мой GitHub">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5C5.73.5.5 5.73.5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.55v-1.94c-3.2.7-3.88-1.54-3.88-1.54-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.04 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.58.23 2.75.12 3.04.74.81 1.19 1.84 1.19 3.1 0 4.43-2.7 5.4-5.27 5.69.41.36.78 1.06.78 2.14v3.17c0 .3.2.66.8.55A11.5 11.5 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5Z"/>
+        </svg>
+      </a>
+      <button class="btn btn-primary" id="newBtn" type="button" title="Новая проблема (N)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+        <span id="newBtnLabel">Новая проблема</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============================ LAYOUT ============================ -->
+  <div class="layout">
+
+    <!-- --------------------------- SIDEBAR --------------------------- -->
+    <aside class="sidebar" aria-label="Фильтры">
+      <div class="side-block">
+        <div class="side-title">Статус</div>
+        <div class="chips" id="statusFilters"></div>
+      </div>
+
+      <div class="side-block">
+        <div class="side-title">Приоритет</div>
+        <div class="chips" id="priorityFilters"></div>
+      </div>
+
+      <div class="side-block">
+        <label class="field-label" for="catFilter">Категория</label>
+        <select id="catFilter"></select>
+
+        <label class="field-label" for="ownerFilter" style="margin-top:6px">Ответственный</label>
+        <select id="ownerFilter"></select>
+
+        <label class="switch" style="margin-top:8px">
+          <input type="checkbox" id="overdueFilter">
+          <span>Только просроченные</span>
+        </label>
+      </div>
+
+      <button class="btn btn-ghost btn-sm btn-block" id="resetFilters" type="button">Сбросить фильтры</button>
+
+      <div class="side-note">
+        Данные лежат локально в браузере (localStorage). Для бэкапа и передачи коллегам — «Экспорт JSON».
+      </div>
+    </aside>
+
+    <!-- ---------------------------- MAIN ----------------------------- -->
+    <main class="main">
+
+      <section class="kpis" aria-label="Сводка">
+        <div class="kpi" style="--kpi-accent: var(--accent-2)">
+          <span class="kpi-label">Открытых проблем</span>
+          <strong class="kpi-value" id="kpiOpen">0</strong>
+          <span class="kpi-hint" id="kpiOpenHint">из 0 всего</span>
+        </div>
+        <div class="kpi" style="--kpi-accent: var(--p1)">
+          <span class="kpi-label">Критичных (P1)</span>
+          <strong class="kpi-value" id="kpiP1">0</strong>
+          <span class="kpi-hint">SLA: реакция в тот же день</span>
+        </div>
+        <div class="kpi" style="--kpi-accent: var(--p2)">
+          <span class="kpi-label">Высоких (P2)</span>
+          <strong class="kpi-value" id="kpiP2">0</strong>
+          <span class="kpi-hint">SLA: до 5 рабочих дней</span>
+        </div>
+        <div class="kpi" style="--kpi-accent: var(--warn)">
+          <span class="kpi-label">В работе</span>
+          <strong class="kpi-value" id="kpiInWork">0</strong>
+          <span class="kpi-hint" id="kpiInWorkHint">нет активных</span>
+        </div>
+        <div class="kpi" style="--kpi-accent: var(--ok)">
+          <span class="kpi-label">Просрочено / решено</span>
+          <strong class="kpi-value" id="kpiOverdue">0</strong>
+          <span class="kpi-hint" id="kpiClosedHint">решено: 0</span>
+        </div>
+      </section>
+
+      <section class="toolbar" aria-label="Панель управления">
+        <div class="segmented" id="viewSwitch" role="tablist" aria-label="Вид">
+          <button type="button" data-view="table" class="is-active" role="tab" aria-selected="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+            Таблица
+          </button>
+          <button type="button" data-view="board" role="tab" aria-selected="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1"></rect><rect x="10" y="4" width="5" height="10" rx="1"></rect><rect x="17" y="4" width="4" height="13" rx="1"></rect></svg>
+            Канбан
+          </button>
+        </div>
+
+        <select id="sortSelect" title="Сортировка" aria-label="Сортировка" style="width:auto">
+          <option value="priority">Сортировка: приоритет</option>
+          <option value="due">Сортировка: срок</option>
+          <option value="updated">Сортировка: обновление</option>
+          <option value="created">Сортировка: создание</option>
+          <option value="title">Сортировка: название</option>
+        </select>
+
+        <span class="count-badge" id="countBadge">0 записей</span>
+        <div class="spacer"></div>
+
+        <button class="btn btn-sm btn-ghost" id="exportJson" type="button" title="Скачать бэкап в JSON">Экспорт JSON</button>
+        <button class="btn btn-sm btn-ghost" id="exportCsv" type="button" title="Выгрузить в CSV для Excel">CSV</button>
+        <button class="btn btn-sm btn-ghost" id="importBtn" type="button" title="Импортировать JSON">Импорт</button>
+        <button class="btn btn-sm btn-ghost btn-icon" id="printBtn" type="button" title="Печать / PDF" aria-label="Печать">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4v-6h16v6h-2"></path><rect x="6" y="14" width="12" height="7" rx="1"></rect></svg>
+        </button>
+        <button class="btn btn-sm btn-ghost btn-icon" id="clearBtn" type="button" title="Очистить всё" aria-label="Очистить всё" style="color:var(--muted)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>
+        </button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+      </section>
+
+      <div id="tableView" class="panel">
+        <div class="table-wrap">
+          <table class="pb">
+            <thead>
+              <tr>
+                <th style="width:78px">ID</th>
+                <th style="width:126px">Приоритет</th>
+                <th>Проблема</th>
+                <th style="width:200px">Риск</th>
+                <th style="width:140px">Статус</th>
+                <th style="width:170px">Ответственный</th>
+                <th style="width:120px">Срок</th>
+                <th style="width:110px">Обновлено</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="boardView" class="panel" hidden>
+        <div class="board-wrap">
+          <div class="board" id="board"></div>
+        </div>
+      </div>
+
+      <div id="emptyState" class="empty" hidden></div>
+
+    </main>
+  </div>
+
+  <!-- ============================ FOOTER ============================ -->
+  <footer class="footer">
+    <a class="gh" href="https://github.com/rusbootlegger" target="_blank" rel="noopener noreferrer">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 .5C5.73.5.5 5.73.5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.55v-1.94c-3.2.7-3.88-1.54-3.88-1.54-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.04 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.58.23 2.75.12 3.04.74.81 1.19 1.84 1.19 3.1 0 4.43-2.7 5.4-5.27 5.69.41.36.78 1.06.78 2.14v3.17c0 .3.2.66.8.55A11.5 11.5 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5Z"/>
+      </svg>
+      github.com/rusbootlegger
+    </a>
+    <span>ProblemBook · реестр проблем Ubuntu-инфраструктуры · данные хранятся локально</span>
+    <span class="spacer"></span>
+    <span>Горячие клавиши: <code>Ctrl K</code> — поиск · <code>N</code> — новая · <code>Esc</code> — закрыть</span>
+  </footer>
+</div>
+
+<!-- ============================ DRAWER ============================ -->
+<div class="backdrop" id="drawerBackdrop"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" aria-hidden="true">
+  <div class="drawer-head">
+    <div class="h">
+      <div class="id-line" id="drawerIdLine"></div>
+      <h2 id="drawerTitle">—</h2>
+    </div>
+    <button class="icon-btn" id="drawerClose" type="button" aria-label="Закрыть">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+  <div class="drawer-foot">
+    <button class="btn btn-primary" id="drawerEdit" type="button">Редактировать</button>
+    <button class="btn" id="drawerDuplicate" type="button">Дублировать</button>
+    <button class="btn btn-danger" id="drawerDelete" type="button">Удалить</button>
+    <span class="spacer" style="flex:1"></span>
+    <button class="btn btn-ghost" id="drawerCloseFoot" type="button">Закрыть</button>
+  </div>
+</aside>
+
+<!-- ============================ MODAL ============================ -->
+<div class="modal-layer" id="modalLayer" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <h2 id="modalTitle">Новая проблема</h2>
+      <button class="icon-btn" id="modalClose" type="button" aria-label="Закрыть">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+    </div>
+    <form id="itemForm" novalidate>
+      <div class="modal-body">
+        <div class="field col-span-2" id="f-title-wrap">
+          <label for="f-title">Проблема <span class="req">*</span></label>
+          <input id="f-title" type="text" placeholder="Например: нет проверенного восстановления из бэкапов" maxlength="300" required>
+          <span class="hint" id="f-title-hint">Коротко и по делу: что именно не так в инфраструктуре.</span>
+        </div>
+
+        <div class="form-row">
+          <div class="field">
+            <label for="f-priority">Приоритет</label>
+            <select id="f-priority"></select>
+            <span class="hint" id="f-priority-hint">Срок реакции по SLA.</span>
+          </div>
+          <div class="field">
+            <label for="f-status">Статус</label>
+            <select id="f-status"></select>
+          </div>
+          <div class="field">
+            <label for="f-category">Категория</label>
+            <select id="f-category"></select>
+          </div>
+        </div>
+
+        <div class="field col-span-2">
+          <label for="f-risk">Риск от проблемы</label>
+          <textarea id="f-risk" rows="3" placeholder="Что произойдёт, если ничего не делать: простой, потеря данных, штрафы, репутация…"></textarea>
+        </div>
+
+        <div class="field col-span-2">
+          <label for="f-actions">Необходимые действия</label>
+          <textarea id="f-actions" rows="4" placeholder="Одно действие — одна строка. В карточке превратится в чек-лист."></textarea>
+          <span class="hint">Каждая строка = отдельный пункт чек-листа.</span>
+        </div>
+
+        <div class="field col-span-2">
+          <label for="f-implRisks">Риски при реализации</label>
+          <textarea id="f-implRisks" rows="3" placeholder="Что может сломаться, пока чиним: окна простоя, откат, зависимость от подрядчика…"></textarea>
+        </div>
+
+        <div class="form-row" style="grid-template-columns: repeat(4, minmax(0,1fr))">
+          <div class="field">
+            <label for="f-owner">Ответственный</label>
+            <input id="f-owner" type="text" placeholder="ФИО / команда" maxlength="120">
+          </div>
+          <div class="field">
+            <label for="f-assets">Системы / хосты</label>
+            <input id="f-assets" type="text" placeholder="srv-db-01, portal, k8s-prod" maxlength="200">
+          </div>
+          <div class="field">
+            <label for="f-due">Срок</label>
+            <input id="f-due" type="date">
+          </div>
+          <div class="field">
+            <label for="f-effort">Трудозатраты, ч/д</label>
+            <input id="f-effort" type="number" min="0" max="9999" step="0.5" placeholder="напр. 3">
+          </div>
+        </div>
+
+        <div class="field col-span-2">
+          <label for="f-notes">Примечания</label>
+          <textarea id="f-notes" rows="3" placeholder="Ссылки, договорённости, контекст, что уже пробовали…"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn btn-ghost" type="button" id="modalCancel">Отмена</button>
+        <button class="btn btn-primary" type="submit" id="modalSubmit">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div id="errBanner" hidden></div>
+
+<script src="assets/app.js"></script>
+</body>
+</html>
