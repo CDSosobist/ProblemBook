@@ -3,66 +3,80 @@
    Тёмная тема по умолчанию, светлая — по кнопке.
    ========================================================================= */
 
+/* Палитра ЭКРОСХИМ: #00875C (основной), #0C6D4F / #00793B (тёмные),
+   #E7F4EE (светлый акцент), нейтрали #5F5F5F / #959595 / #F8F8F8. */
 :root {
   color-scheme: dark;
 
-  --bg: #06090f;
-  --bg-glow-1: rgba(99, 102, 241, 0.16);
-  --bg-glow-2: rgba(34, 211, 238, 0.10);
-  --surface: #0c121c;
-  --surface-2: #111a27;
-  --surface-3: #16202f;
-  --line: rgba(148, 163, 184, 0.16);
-  --line-strong: rgba(148, 163, 184, 0.28);
-  --text: #e8eefb;
-  --muted: #93a3bb;
-  --muted-2: #6b7c94;
+  --bg: #070d0a;
+  --bg-glow-1: rgba(0, 135, 92, 0.20);
+  --bg-glow-2: rgba(0, 165, 113, 0.10);
+  --surface: #0c1310;
+  --surface-2: #111b17;
+  --surface-3: #17241f;
+  --line: rgba(148, 190, 170, 0.16);
+  --line-strong: rgba(148, 190, 170, 0.30);
+  --text: #e9f1ed;
+  --muted: #94ab9f;
+  --muted-2: #6d857a;
 
-  --accent: #6366f1;
-  --accent-2: #22d3ee;
-  --accent-soft: rgba(99, 102, 241, 0.16);
+  --accent: #00a571;
+  --accent-2: #33d19a;
+  --accent-soft: rgba(0, 165, 113, 0.16);
+  --brand: #00875c;
+  --brand-deep: #0c6d4f;
+  --brand-light: #e7f4ee;
+  --brand-filter: brightness(1.16) saturate(1.05);
 
   --p1: #fb7185;
   --p2: #fbbf24;
   --p3: #38bdf8;
   --p4: #94a3b8;
   --ok: #34d399;
-  --warn: #f59e0b;
-  --danger: #f43f5e;
+  --warn: #f0b429;
+  --danger: #f0616f;
 
   --radius-lg: 20px;
   --radius: 14px;
   --radius-sm: 10px;
   --shadow-lg: 0 24px 60px -30px rgba(0, 0, 0, 0.9);
   --shadow-sm: 0 8px 20px -14px rgba(0, 0, 0, 0.8);
-  --font: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font: "Rubik", "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 }
 
 html[data-theme="light"] {
   color-scheme: light;
 
-  --bg: #f4f6fb;
-  --bg-glow-1: rgba(99, 102, 241, 0.10);
-  --bg-glow-2: rgba(14, 165, 233, 0.08);
+  --bg: #f4f7f5;
+  --bg-glow-1: rgba(0, 135, 92, 0.10);
+  --bg-glow-2: rgba(0, 165, 113, 0.07);
   --surface: #ffffff;
-  --surface-2: #f7f9fd;
-  --surface-3: #eef2f9;
-  --line: rgba(15, 23, 42, 0.10);
-  --line-strong: rgba(15, 23, 42, 0.20);
-  --text: #10182a;
-  --muted: #56657d;
-  --muted-2: #71809a;
-  --accent-soft: rgba(99, 102, 241, 0.12);
-  --p1: #e11d48;
-  --p2: #b45309;
+  --surface-2: #f5f8f6;
+  --surface-3: #e9f1ec;
+  --line: rgba(16, 45, 34, 0.12);
+  --line-strong: rgba(16, 45, 34, 0.22);
+  --text: #12201a;
+  --muted: #55685f;
+  --muted-2: #7b8d84;
+
+  --accent: #00875c;
+  --accent-2: #006b48;
+  --accent-soft: #e7f4ee;
+  --brand: #00875c;
+  --brand-deep: #0c6d4f;
+  --brand-light: #e7f4ee;
+  --brand-filter: none;
+
+  --p1: #c81e3d;
+  --p2: #a45c00;
   --p3: #0369a1;
   --p4: #64748b;
   --ok: #047857;
-  --warn: #b45309;
-  --danger: #dc2626;
-  --shadow-lg: 0 24px 60px -34px rgba(15, 23, 42, 0.45);
-  --shadow-sm: 0 8px 20px -16px rgba(15, 23, 42, 0.4);
+  --warn: #a45c00;
+  --danger: #b91c3c;
+  --shadow-lg: 0 24px 60px -34px rgba(16, 45, 34, 0.35);
+  --shadow-sm: 0 8px 20px -16px rgba(16, 45, 34, 0.3);
 }
 
 * { box-sizing: border-box; }
@@ -128,21 +142,25 @@ body.no-scroll { overflow: hidden; }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .brand:hover { text-decoration: none; }
 
-.brand-mark {
-  width: 42px; height: 42px;
-  flex: 0 0 42px;
-  display: grid; place-items: center;
-  border-radius: 13px;
-  background: linear-gradient(145deg, var(--accent), var(--accent-2));
-  color: #fff;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  box-shadow: 0 10px 26px -12px rgba(99, 102, 241, 0.9);
+.brand-logo {
+  height: 32px;
+  width: auto;
+  max-width: 168px;
+  flex: 0 0 auto;
+  filter: var(--brand-filter);
+}
+
+.login-logo {
+  height: 30px;
+  width: auto;
+  max-width: 160px;
+  filter: var(--brand-filter);
 }
 
 .brand-text { display: flex; flex-direction: column; min-width: 0; }
 .brand-text strong { font-size: 17px; letter-spacing: -0.02em; }
-.brand-text small { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.brand-text small { color: var(--muted); font-size: 11.5px; line-height: 1.25; letter-spacing: 0.01em; }
+.brand-divider { flex: 0 0 auto; width: 1px; height: 28px; background: var(--line-strong); }
 
 .search {
   flex: 1 1 420px;
@@ -209,12 +227,12 @@ body.no-scroll { overflow: hidden; }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .btn-primary {
-  background: linear-gradient(140deg, var(--accent), #7c3aed 70%, var(--accent-2));
+  background: linear-gradient(140deg, var(--brand), #0fa96f 65%, var(--accent));
   border-color: transparent;
   color: #fff;
-  box-shadow: 0 14px 30px -16px rgba(99, 102, 241, 0.95);
+  box-shadow: 0 14px 30px -16px rgba(0, 135, 92, 0.85);
 }
-.btn-primary:hover { filter: brightness(1.06); background: linear-gradient(140deg, var(--accent), #7c3aed 70%, var(--accent-2)); }
+.btn-primary:hover { filter: brightness(1.07); }
 
 .btn-ghost { background: transparent; }
 .btn-danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); }
@@ -893,7 +911,7 @@ html[data-theme="light"] .badge-status.rejected { color: #475569; }
   .layout { grid-template-columns: minmax(0, 1fr); }
   .sidebar { position: static; order: 2; }
   .search kbd { display: none; }
-  .brand-text small { display: none; }
+  .brand-divider, .brand-text { display: none; }
   .modal-body { grid-template-columns: minmax(0, 1fr); }
   .form-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -1037,8 +1055,8 @@ html[data-theme="light"] .badge-status.rejected { color: #475569; }
   background: var(--surface);
   box-shadow: var(--shadow-lg);
 }
-.login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
-.login-brand .brand-text strong { font-size: 16px; }
+.login-brand { display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
+.login-caption { text-align: center; font-size: 12px; color: var(--muted); margin: -6px 0 6px; }
 .login-error {
   padding: 9px 11px;
   border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);

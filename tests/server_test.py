@@ -176,8 +176,10 @@ def main():
         status, payload, _ = anon.json('GET', '/api/health')
         check('health без авторизации', status == 200 and payload['ok'] is True, str(status))
         status, raw, heads = anon.call('GET', '/')
-        check('главная страница раздаётся', status == 200 and b'ProblemBook' in raw,
+        check('главная страница раздаётся', status == 200 and 'ЭКРОСХИМ'.encode('utf-8') in raw,
               str(status))
+        check('в разметке подключён логотип', b'branding/logo.svg' in raw)
+        check('в разметке корпоративная иконка', b'branding/favicon' in raw)
         check('content-type html', 'text/html' in heads.get('Content-Type', ''), heads.get('Content-Type', ''))
         status, raw, _ = anon.call('GET', '/assets/app.js')
         check('assets/app.js раздаётся', status == 200 and b'ProblemBook' in raw, str(status))

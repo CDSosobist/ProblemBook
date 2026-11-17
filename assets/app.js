@@ -321,7 +321,7 @@
 
   function onAuthenticated() {
     if (el.storageNote) {
-      el.storageNote.textContent = 'ProblemBook · реестр проблем ИТ-инфраструктуры · общий реестр на сервере';
+      el.storageNote.textContent = 'ЭКРОСХИМ · реестр проблем ИТ-инфраструктуры · общий реестр на сервере';
     }
     var readonly = server.user.role === 'viewer';
     document.body.classList.toggle('is-readonly', readonly);
@@ -783,7 +783,7 @@
   function emptyMarkup() {
     return ''
       + '<svg width="88" height="88" viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-      + '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#22d3ee"/></linearGradient></defs>'
+      + '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#00875c"/><stop offset="100%" stop-color="#33d19a"/></linearGradient></defs>'
       + '<path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/>'
       + '<path d="M14 3v5h5"/><path d="M9.5 13h6M9.5 16.5h4"/></svg>'
       + '<h3>Проблембук пуст</h3>'

@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<title>ProblemBook — тест серверного режима</title>
+<title>ЭКРОСХИМ — тест серверного режима</title>
 <style>
   body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 16px; background: #0b0f16; color: #e8eefb; }
   iframe { width: 1280px; height: 720px; border: 1px solid #2a3444; border-radius: 8px; background: #fff; margin-top: 12px; }
@@ -106,7 +106,7 @@
     doc = frame.contentDocument;
     win = frame.contentWindow;
 
-    check('страница проблембука загрузилась', /ProblemBook/.test(doc.title), doc.title);
+    check('страница проблембука загрузилась', /реестр проблем/.test(doc.title), doc.title);
     check('нет ошибки на странице', doc.getElementById('errBanner').hidden,
           doc.getElementById('errBanner').textContent);
     check('реестр загружен с сервера: 3 строки',

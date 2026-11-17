@@ -67,7 +67,8 @@
 
     /* 1. Пустое состояние и разметка */
     ok('нет JS-ошибок при загрузке', errText() === '', errText());
-    ok('заголовок страницы', document.title.indexOf('ProblemBook') >= 0, document.title);
+    ok('заголовок страницы с брендом', document.title.indexOf('ЭКРОСХИМ') >= 0 &&
+      document.title.indexOf('реестр проблем') >= 0, document.title);
     ok('пустой реестр: пустое состояние', rowCount() === 0 && q('#emptyState') && !q('#emptyState').hidden,
       'rows=' + rowCount());
     ok('KPI открытых = 0', q('#kpiOpen').textContent === '0', q('#kpiOpen').textContent);
@@ -288,9 +289,11 @@
       de.scrollWidth <= window.innerWidth + 2,
       de.scrollWidth + ' > ' + window.innerWidth);
 
-    var brand = q('.brand-mark');
-    var brandWidth = brand ? Math.round(parseFloat(getComputedStyle(brand).width)) : 0;
-    ok(prefix + 'CSS загружен (brand-mark 42px)', brandWidth === 42, String(brandWidth));
+    var logo = q('.brand-logo');
+    var logoHeight = logo ? Math.round(parseFloat(getComputedStyle(logo).height)) : 0;
+    ok(prefix + 'CSS загружен (логотип 32px)', logoHeight === 32, String(logoHeight));
+    ok(prefix + 'логотип ЭКРОСХИМ подгрузился', !!logo && logo.naturalWidth > 0,
+      logo ? String(logo.naturalWidth) : 'нет элемента');
 
     ok(prefix + 'тема реально применена',
       getComputedStyle(document.body).backgroundColor !== 'rgba(0, 0, 0, 0)',
