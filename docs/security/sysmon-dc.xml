@@ -1,0 +1,107 @@
+<!--
+  Sysmon — конфигурация для контроллера домена (Windows Server 2012 R2).
+  Устанавливается вместе с wef-sysmon-setup.ps1, версия Sysmon — та, что
+  поддерживает Server 2012 R2 (13.x / 14.x; более новые сборки официально
+  ориентированы на поддерживаемые ОС — проверить матрицу совместимости).
+
+  Принцип: сначала пишем всё нужное для расследования, шум убираем позже,
+  по реальным данным, а не заранее «на глаз». Конфиг сознательно не исключает
+  системные процессы и каталоги: единственное исключение — служебные события
+  самого защитного ПО, иначе в логе нечего разбирать.
+-->
+<Sysmon schemaversion="4.50">
+  <HashAlgorithms>SHA256</HashAlgorithms>
+  <CheckRevocation/>
+
+  <EventFiltering>
+    <!-- 1. Запуск процессов: базовая точка для любого расследования -->
+    <RuleGroup name="" groupRelation="or">
+      <ProcessCreate onmatch="exclude">
+        <!-- Шумные, но безопасные вызовы: включить при необходимости, изучив объём
+        <Image condition="is">C:\Windows\System32\conhost.exe</Image>
+        -->
+      </ProcessCreate>
+    </RuleGroup>
+
+    <!-- 3. Сетевые соединения: боковое перемещение, C2, обращения к DC -->
+    <RuleGroup name="" groupRelation="or">
+      <NetworkConnect onmatch="exclude">
+        <!-- Пример: исключить локальные соединения к системным портам после базового замера
+        <DestinationIsIpv6 condition="is">true</DestinationIsIpv6>
+        -->
+      </NetworkConnect>
+    </RuleGroup>
+
+    <!-- 6. Загрузка драйверов: признак подписи и подмены -->
+    <RuleGroup name="" groupRelation="or">
+      <DriverLoad onmatch="exclude"/>
+    </RuleGroup>
+
+    <!-- 7. Загрузка образов — очень шумно, включать только прицельно.
+         Для поиска боковой загрузки DLL на конкретных процессах использовать
+         condition="include" с перечнем Image.
+
+    <RuleGroup name="" groupRelation="or">
+      <ImageLoad onmatch="include">
+        <ImageLoaded condition="begin with">C:\Users\</ImageLoaded>
+      </ImageLoad>
+    </RuleGroup>
+    -->
+
+    <!-- 8. Удалённое создание потоков: инъекции в процессы -->
+    <RuleGroup name="" groupRelation="or">
+      <CreateRemoteThread onmatch="exclude"/>
+    </RuleGroup>
+
+    <!-- 9. Прямое чтение диска: теневое копирование и кража баз -->
+    <RuleGroup name="" groupRelation="or">
+      <RawAccessRead onmatch="exclude"/>
+    </RuleGroup>
+
+    <!-- 10. Доступ к процессам — прицельно по LSASS: попытка получить хеши -->
+    <RuleGroup name="" groupRelation="or">
+      <ProcessAccess onmatch="include">
+        <TargetImage condition="is">C:\Windows\system32\lsass.exe</TargetImage>
+        <!-- После замера шума исключить легитимные агенты, например антивирус:
+        <SourceImage condition="begin with">C:\Program Files (x86)\Kaspersky Lab\</SourceImage>
+        -->
+      </ProcessAccess>
+    </RuleGroup>
+
+    <!-- 17/18. Именованные каналы: управление, обход сегментации -->
+    <RuleGroup name="" groupRelation="or">
+      <PipeEvent onmatch="exclude">
+        <EventType condition="is">Connect</EventType>
+      </PipeEvent>
+    </RuleGroup>
+
+    <!-- 11. Создание файлов в подозрительных местах: TEMP, Startup, System32, автозагрузка -->
+    <RuleGroup name="" groupRelation="or">
+      <FileCreate onmatch="include">
+        <TargetFilename condition="begin with">C:\Users\</TargetFilename>
+        <TargetFilename condition="begin with">C:\Windows\System32\</TargetFilename>
+        <TargetFilename condition="begin with">C:\Windows\SysWOW64\</TargetFilename>
+        <TargetFilename condition="begin with">C:\Windows\Temp\</TargetFilename>
+        <TargetFilename condition="begin with">C:\Temp\</TargetFilename>
+        <TargetFilename condition="begin with">C:\ProgramData\</TargetFilename>
+      </FileCreate>
+    </RuleGroup>
+
+    <!-- 12/13/14. Реестр: автозапуск и изменения служб -->
+    <RuleGroup name="" groupRelation="or">
+      <RegistryEvent onmatch="include">
+        <TargetObject condition="contains any">Run;RunOnce;Winlogon;Services;Drivers32;Image File Execution Options;LSA;SecurityProviders</TargetObject>
+      </RegistryEvent>
+    </RuleGroup>
+
+    <!-- 19/20/21. WMI: постоянные потребители событий — частая закладка -->
+    <RuleGroup name="" groupRelation="or">
+      <WmiEvent onmatch="exclude"/>
+    </RuleGroup>
+
+    <!-- 22. DNS-запросы: помогает видеть C2 и подозрительные домены -->
+    <RuleGroup name="" groupRelation="or">
+      <DnsQuery onmatch="exclude"/>
+    </RuleGroup>
+  </EventFiltering>
+</Sysmon>
