@@ -309,7 +309,27 @@
     MODE = 'local';
     load();
     applyTheme();
+    updateStorageHint();
     renderAll();
+  }
+
+  function updateStorageHint() {
+    if (!el.storageHint) return;
+    if (MODE !== 'server' || !server.loaded) {
+      el.storageHint.textContent = 'Данные лежат локально в браузере (localStorage). '
+        + 'Для бэкапа и передачи коллегам — «Экспорт JSON».';
+      return;
+    }
+    var text = 'Реестр хранится на сервере, версия ' + server.revision;
+    if (server.updatedBy) {
+      text += ', последнее сохранение — ' + server.updatedBy;
+      if (server.updatedAt) text += ' (' + fmtDateTime(server.updatedAt) + ')';
+    }
+    text += '. Экспорт JSON — резервная копия для передачи коллегам.';
+    if (server.user && server.user.role === 'viewer') {
+      text += ' Ваша роль — только чтение.';
+    }
+    el.storageHint.textContent = text;
   }
 
   function enterServerMode(data) {
@@ -347,10 +367,13 @@
     apiCall('api/state').then(function (data) {
       state.items = (data.items || []).map(normalizeItem);
       server.revision = data.revision;
+      server.updatedAt = data.updatedAt || '';
+      server.updatedBy = data.updatedBy || '';
       server.loaded = true;
       server.conflict = null;
       hideConflict();
       writeStore();
+      updateStorageHint();
       renderAll();
       setSyncStatus('ok');
       startPolling();
@@ -404,7 +427,7 @@
     el.syncChip.className = 'sync-chip is-' + kind;
     var text = {
       syncing: 'сохраняю…',
-      ok: 'сохранено на сервере',
+      ok: 'сохранено на сервере · версия ' + server.revision,
       conflict: 'конфликт версий',
       error: 'ошибка сохранения'
     }[kind] || kind;
@@ -563,6 +586,7 @@
     el.logoutBtn = $('#logoutBtn');
     el.syncChip = $('#syncChip');
     el.storageNote = $('#storageNote');
+    el.storageHint = $('#storageHint');
     el.printMeta = $('#printMeta');
     el.serverBanner = $('#serverBanner');
   }

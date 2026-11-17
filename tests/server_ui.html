@@ -124,6 +124,16 @@
           !doc.getElementById('syncChip').hidden &&
           doc.getElementById('syncChip').textContent.indexOf('сохранено') >= 0,
           doc.getElementById('syncChip').textContent);
+    check('счётчик показывает версию реестра',
+          /версия/i.test(doc.getElementById('syncChip').textContent),
+          doc.getElementById('syncChip').textContent);
+    check('подпись в сайдбаре говорит о сервере, а не о localStorage',
+          /сервер/i.test(doc.getElementById('storageHint').textContent) &&
+          !/localStorage/i.test(doc.getElementById('storageHint').textContent),
+          doc.getElementById('storageHint').textContent.slice(0, 90));
+    check('футер говорит про общий реестр на сервере',
+          /на сервере/i.test(doc.getElementById('storageNote').textContent),
+          doc.getElementById('storageNote').textContent);
     check('вход не требуется повторно', doc.getElementById('loginLayer').hidden);
     check('кнопка «Новая проблема» доступна (не readonly)',
           !doc.body.classList.contains('is-readonly'));
