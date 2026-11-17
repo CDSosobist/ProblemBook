@@ -222,6 +222,7 @@ docs/edr-selection.md   критерии выбора EDR: стоп-услови
 docs/edr-rfi-letter.md  шаблон письма вендорам для запроса предложений по EDR
 docs/mail-onprem.md     внутренний почтовый сервер: варианты, требования, чек-лист миграции
 docs/security/          компенсирующие меры: sysmon-dc.xml, wef-sysmon-setup.ps1, kes-dc-exclusions.md
+docs/security/runbook-week1.md  команды первой недели: krbtgt, спулер на DC, права на бэкапах
 ```
 
 Разметка, стили и логика разделены; внешних библиотек и шрифтов нет — страница работает офлайн.
