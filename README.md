@@ -220,6 +220,7 @@ serve.sh                локальный статический сервер
 docs/screenshot.png     скриншот с демо-данными
 docs/edr-selection.md   критерии выбора EDR: стоп-условия, требования, вопросы вендору, матрица оценки
 docs/edr-rfi-letter.md  шаблон письма вендорам для запроса предложений по EDR
+docs/mail-onprem.md     внутренний почтовый сервер: варианты, требования, чек-лист миграции
 docs/security/          компенсирующие меры: sysmon-dc.xml, wef-sysmon-setup.ps1, kes-dc-exclusions.md
 ```
 
