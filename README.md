@@ -224,6 +224,7 @@ docs/mail-onprem.md     внутренний почтовый сервер: ва
 docs/security/          компенсирующие меры: sysmon-dc.xml, wef-sysmon-setup.ps1, kes-dc-exclusions.md
 docs/security/runbook-week1.md  команды первой недели: krbtgt, спулер на DC, права на бэкапах
 docs/security/firewall-replacement-plan.md  план замены 7 межсетевых экранов m0n0wall → OPNsense
+docs/security/rack-cooling-plan.md      шкафное охлаждение: расчёт тепла, выбор блока, монтаж, проверка
 ```
 
 Разметка, стили и логика разделены; внешних библиотек и шрифтов нет — страница работает офлайн.
