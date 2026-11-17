@@ -20,7 +20,8 @@
   <!-- ============================ TOPBAR ============================ -->
   <header class="topbar">
     <a class="brand" href="./" title="ЭКРОСХИМ — реестр проблем ИТ-инфраструктуры">
-      <img class="brand-logo" src="assets/branding/logo.svg" alt="ЭКРОСХИМ" width="148" height="32">
+      <img class="brand-logo logo-for-light" src="assets/branding/logo.svg" alt="ЭКРОСХИМ" width="148" height="32">
+      <img class="brand-logo logo-for-dark" src="assets/branding/logo-dark.svg" alt="ЭКРОСХИМ" width="148" height="32">
       <span class="brand-divider" aria-hidden="true"></span>
       <span class="brand-text">
         <small>Реестр проблем<br>ИТ-инфраструктуры</small>
@@ -58,6 +59,15 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
         <span id="newBtnLabel">Новая проблема</span>
       </button>
+    </div>
+  </header>
+
+  <!-- ======================== ПЕЧАТНАЯ ШАПКА ======================== -->
+  <header class="print-head">
+    <img class="print-logo" src="assets/branding/logo.svg" alt="ЭКРОСХИМ">
+    <div class="print-meta">
+      <h1>Реестр проблем ИТ-инфраструктуры</h1>
+      <span id="printMeta"></span>
     </div>
   </header>
 
@@ -317,7 +327,8 @@
 <div class="login-layer" id="loginLayer" hidden>
   <form class="login-card" id="loginForm" novalidate>
     <div class="login-brand">
-      <img class="login-logo" src="assets/branding/logo.svg" alt="ЭКРОСХИМ" width="160" height="35">
+      <img class="login-logo logo-for-light" src="assets/branding/logo.svg" alt="ЭКРОСХИМ" width="160" height="35">
+      <img class="login-logo logo-for-dark" src="assets/branding/logo-dark.svg" alt="ЭКРОСХИМ" width="160" height="35">
     </div>
     <p class="login-caption">Реестр проблем ИТ-инфраструктуры</p>
     <label class="field">

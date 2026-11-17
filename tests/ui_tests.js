@@ -117,6 +117,12 @@
     ok('в карточке 3 пункта чек-листа', qa('#drawerBody .check-item').length === 3);
     ok('в карточке все блоки', ['Риск от проблемы', 'Необходимые действия', 'Риски при реализации', 'Примечания', 'Детали', 'История']
       .every(function (t) { return q('#drawerBody').textContent.indexOf(t) >= 0; }));
+    ok('печатная шапка скрыта на экране',
+      getComputedStyle(q('.print-head')).display === 'none',
+      getComputedStyle(q('.print-head')).display);
+    ok('метаданные для печати заполнены',
+      (q('#printMeta').textContent || '').indexOf('проблем в реестре') >= 0,
+      q('#printMeta').textContent);
     ok('KPI: P1 = 1, в работе = 1', q('#kpiP1').textContent === '1' && q('#kpiInWork').textContent === '1',
       q('#kpiP1').textContent + '/' + q('#kpiInWork').textContent);
     ok('форма закрылась', q('#modalLayer').hidden);

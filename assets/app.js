@@ -245,7 +245,7 @@
     state.items = items.map(normalizeItem);
   }
 
-  function save() {
+  function writeStore() {
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify({
         app: 'problembook',
@@ -257,6 +257,10 @@
     } catch (e) {
       banner('Не удалось сохранить данные в браузере (хранилище переполнено или недоступно). Экспортируйте JSON.');
     }
+  }
+
+  function save() {
+    writeStore();
     if (MODE === 'server') scheduleSync();
   }
 
@@ -346,7 +350,7 @@
       server.loaded = true;
       server.conflict = null;
       hideConflict();
-      save();
+      writeStore();
       renderAll();
       setSyncStatus('ok');
       startPolling();
@@ -559,7 +563,24 @@
     el.logoutBtn = $('#logoutBtn');
     el.syncChip = $('#syncChip');
     el.storageNote = $('#storageNote');
+    el.printMeta = $('#printMeta');
     el.serverBanner = $('#serverBanner');
+  }
+
+  function updatePrintMeta() {
+    if (!el.printMeta) return;
+    var open = 0;
+    var critical = 0;
+    state.items.forEach(function (item) {
+      if (!closedStatus(item.status)) {
+        open++;
+        if (item.priority === 'P1') critical++;
+      }
+    });
+    var parts = ['сформирован ' + fmtDate(todayISO(), true), 'проблем в реестре: ' + state.items.length,
+                 'открытых: ' + open, 'критичных P1: ' + critical];
+    if (MODE === 'server' && server.user) parts.push('выгрузил: ' + server.user.name);
+    el.printMeta.textContent = parts.join(' · ');
   }
 
   function renderAll() {
@@ -567,6 +588,7 @@
     renderKpi();
     renderList();
     renderToolbar();
+    updatePrintMeta();
   }
 
   /* ---------- сайдбар ---------- */
@@ -707,7 +729,7 @@
       '<td>' + statusBadge(item.status) + '</td>' +
       '<td class="cell-owner">' + (item.owner
         ? '<span class="avatar">' + esc(initials(item.owner)) + '</span>' + esc(item.owner)
-        : '<span style="color:var(--muted-2)">не назначен</span>') + '</td>' +
+        : '<span style="color:var(--muted-2)">Не назначен</span>') + '</td>' +
       '<td class="cell-due' + (isOverdue(item) ? ' is-overdue' : '') + '">' + esc(fmtDate(item.due)) + '</td>' +
       '<td class="cell-id">' + esc(fmtDate(item.updatedAt)) + '</td>' +
       '</tr>';
@@ -720,7 +742,7 @@
         '<span class="card-id">' + esc(item.id) + '</span></div>' +
       '<span class="card-title">' + esc(item.title) + '</span>' +
       '<div class="card-meta">' +
-        (item.owner ? '<span>' + esc(item.owner) + '</span>' : '<span>не назначен</span>') +
+        (item.owner ? '<span>' + esc(item.owner) + '</span>' : '<span>Не назначен</span>') +
         (item.due ? '<span class="' + (isOverdue(item) ? 'overdue' : '') + '">· ' + esc(fmtDate(item.due)) + '</span>' : '') +
         (isOverdue(item) ? '<span class="overdue">просрочено</span>' : '') +
       '</div>' +
@@ -857,7 +879,7 @@
 
     var meta = ''
       + '<div class="meta-item"><span class="k">Категория</span><span class="v">' + esc(item.category || '—') + '</span></div>'
-      + '<div class="meta-item"><span class="k">Ответственный</span><span class="v">' + esc(item.owner || 'не назначен') + '</span></div>'
+      + '<div class="meta-item"><span class="k">Ответственный</span><span class="v">' + esc(item.owner || 'Не назначен') + '</span></div>'
       + '<div class="meta-item"><span class="k">Системы / хосты</span><span class="v">' + esc(item.assets || '—') + '</span></div>'
       + '<div class="meta-item"><span class="k">Срок</span><span class="v"' + (isOverdue(item) ? ' style="color:var(--danger);font-weight:700"' : '') + '>' + esc(fmtDate(item.due, true)) + '</span></div>'
       + '<div class="meta-item"><span class="k">Трудозатраты</span><span class="v">' + (item.effort ? esc(item.effort) + ' ч/д' : '—') + '</span></div>'
@@ -1706,6 +1728,8 @@
       banner('Ошибка в ProblemBook: ' + (event.message || 'неизвестная') + '. Обновите страницу; данные не потеряны.');
       console.error(event.error || event.message);
     });
+
+    window.addEventListener('beforeprint', updatePrintMeta);
 
     window.addEventListener('beforeunload', function (event) {
       if (MODE === 'server' && (server.pending || server.conflict)) {

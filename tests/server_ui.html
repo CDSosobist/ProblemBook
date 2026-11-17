@@ -102,6 +102,8 @@
     var admin = await login('testadmin', 'adminpassword1');
     check('вход администратора', admin.user && admin.user.role === 'admin', JSON.stringify(admin.user));
 
+    var beforeLoad = await api('/api/state');
+
     frame = await loadFrame();
     doc = frame.contentDocument;
     win = frame.contentWindow;
@@ -125,6 +127,11 @@
     check('вход не требуется повторно', doc.getElementById('loginLayer').hidden);
     check('кнопка «Новая проблема» доступна (не readonly)',
           !doc.body.classList.contains('is-readonly'));
+
+    var afterLoad = await api('/api/state');
+    check('открытие страницы не создаёт новую версию реестра',
+          afterLoad.revision === beforeLoad.revision,
+          beforeLoad.revision + ' → ' + afterLoad.revision);
 
     /* создание проблемы через интерфейс и проверка на сервере */
     doc.getElementById('newBtn').click();

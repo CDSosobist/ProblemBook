@@ -183,6 +183,12 @@ def main():
         check('content-type html', 'text/html' in heads.get('Content-Type', ''), heads.get('Content-Type', ''))
         status, raw, _ = anon.call('GET', '/assets/app.js')
         check('assets/app.js раздаётся', status == 200 and b'ProblemBook' in raw, str(status))
+        for asset, marker in (('/assets/fonts/rubik-cyrillic.woff2', b'wOF2'),
+                              ('/assets/fonts/rubik-latin.woff2', b'wOF2'),
+                              ('/assets/fonts/OFL.txt', b'Copyright'),
+                              ('/assets/branding/logo-dark.svg', b'#35D19B')):
+            code, payload_bytes, _ = anon.call('GET', asset)
+            check('отдаётся %s' % asset, code == 200 and marker in payload_bytes, str(code))
         status, _, _ = anon.call('GET', '/etc/passwd')
         check('выход за пределы каталога закрыт', status == 404, str(status))
         status, _, _ = anon.call('GET', '/assets/../index.html')
