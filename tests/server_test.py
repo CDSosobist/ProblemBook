@@ -131,7 +131,7 @@ def sample_items(n=3):
             'assets': 'TITAN', 'risk': 'риск %d' % i,
             'actions': ['шаг 1', 'шаг 2'], 'done': [0],
             'implRisks': 'риск реализации', 'notes': 'примечание',
-            'due': '2026-12-01', 'effort': 2,
+            'due': '2026-12-01', 'effort': 2, 'order': float(i * 10),
             'createdAt': '2026-11-17T10:00:00', 'updatedAt': '2026-11-17T10:00:00',
             'history': [{'ts': '2026-11-17T10:00:00', 'text': 'создана'}],
         })
@@ -231,6 +231,8 @@ def main():
 
         status, payload, _ = admin.json('GET', '/api/state')
         check('в реестре одна проблема после перезаписи', len(payload['items']) == 1, str(len(payload['items'])))
+        check('порядок карточки в колонке сохранён', payload['items'][0].get('order') == 10.0,
+              str(payload['items'][0].get('order')))
         check('автор последнего сохранения зафиксирован', payload['updatedBy'] == 'admin', payload['updatedBy'])
 
         # --- импорт

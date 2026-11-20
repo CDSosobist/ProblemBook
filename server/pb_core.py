@@ -298,6 +298,7 @@ def validate_items(raw):
             "notes": _clip(item.get("notes") or "", LIMITS["notes"], "notes"),
             "due": _clip(item.get("due") or "", 10, "due"),
             "effort": item.get("effort") if isinstance(item.get("effort"), (int, float)) else None,
+            "order": float(item.get("order")) if isinstance(item.get("order"), (int, float)) else None,
             "createdAt": _clip(item.get("createdAt") or now_iso(), 40, "createdAt"),
             "updatedAt": _clip(item.get("updatedAt") or now_iso(), 40, "updatedAt"),
             "history": [

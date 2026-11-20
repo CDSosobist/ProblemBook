@@ -1113,3 +1113,44 @@ body.is-readonly #drawerDuplicate,
 body.is-readonly #drawerDelete { display: none !important; }
 body.is-readonly .card { cursor: default; }
 body.is-readonly #drawerStatus { opacity: 0.7; }
+
+/* ========================================================================
+   Канбан: перетаскивание карточек
+   ======================================================================== */
+.card { touch-action: none; }
+.card.is-dragging { opacity: 0.28; }
+.card.drag-ghost {
+  position: fixed;
+  z-index: 200;
+  margin: 0;
+  pointer-events: none;
+  box-shadow: var(--shadow-lg);
+  border-color: var(--line-strong);
+  transform: rotate(1.2deg) scale(1.02);
+  transition: none;
+}
+body.is-board-dragging { cursor: grabbing; user-select: none; }
+body.is-board-dragging .card { cursor: grabbing; }
+
+.col.is-drop {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: var(--accent-soft);
+}
+
+.drop-placeholder {
+  height: 64px;
+  margin: 0;
+  border: 2px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  pointer-events: none;
+}
+
+.col-empty {
+  padding: 10px 6px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted-2);
+}

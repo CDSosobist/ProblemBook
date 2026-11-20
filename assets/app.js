@@ -152,6 +152,7 @@
       notes: String(item.notes || ''),
       due: /^\d{4}-\d{2}-\d{2}$/.test(item.due || '') ? item.due : '',
       effort: item.effort === 0 || item.effort ? Number(item.effort) : null,
+      order: typeof item.order === 'number' && isFinite(item.order) ? item.order : null,
       createdAt: item.createdAt || now,
       updatedAt: item.updatedAt || now,
       history: Array.isArray(item.history) ? item.history.filter(function (h) {
@@ -562,6 +563,7 @@
     el.boardView = $('#boardView');
     el.tableBody = $('#tableBody');
     el.board = $('#board');
+    el.boardWrap = $('#boardView .board-wrap');
     el.emptyState = $('#emptyState');
     el.drawer = $('#drawer');
     el.drawerBackdrop = $('#drawerBackdrop');
@@ -703,26 +705,37 @@
     if (f.overdue) list = list.filter(isOverdue);
     if (q) list = list.filter(function (i) { return haystack(i).indexOf(q) >= 0; });
 
-    var sort = state.ui.sort;
-    list.sort(function (a, b) {
-      if (sort === 'due') {
-        if (!a.due && !b.due) return prio(a.priority).order - prio(b.priority).order;
-        if (!a.due) return 1;
-        if (!b.due) return -1;
-        return a.due < b.due ? -1 : a.due > b.due ? 1 : 0;
-      }
-      if (sort === 'updated') return (b.updatedAt || '').localeCompare(a.updatedAt || '');
-      if (sort === 'created') return (b.createdAt || '').localeCompare(a.createdAt || '');
-      if (sort === 'title') return a.title.localeCompare(b.title, 'ru');
-      var d = prio(a.priority).order - prio(b.priority).order;
-      if (d) return d;
-      if (a.due && b.due && a.due !== b.due) return a.due < b.due ? -1 : 1;
-      if (a.due && !b.due) return -1;
-      if (!a.due && b.due) return 1;
-      return (b.updatedAt || '').localeCompare(a.updatedAt || '');
-    });
-
+    list.sort(compareItems);
     return list;
+  }
+
+  function compareItems(a, b) {
+    var sort = state.ui.sort;
+    if (sort === 'due') {
+      if (!a.due && !b.due) return prio(a.priority).order - prio(b.priority).order;
+      if (!a.due) return 1;
+      if (!b.due) return -1;
+      return a.due < b.due ? -1 : a.due > b.due ? 1 : 0;
+    }
+    if (sort === 'updated') return (b.updatedAt || '').localeCompare(a.updatedAt || '');
+    if (sort === 'created') return (b.createdAt || '').localeCompare(a.createdAt || '');
+    if (sort === 'title') return a.title.localeCompare(b.title, 'ru');
+    var d = prio(a.priority).order - prio(b.priority).order;
+    if (d) return d;
+    if (a.due && b.due && a.due !== b.due) return a.due < b.due ? -1 : 1;
+    if (a.due && !b.due) return -1;
+    if (!a.due && b.due) return 1;
+    return (b.updatedAt || '').localeCompare(a.updatedAt || '');
+  }
+
+  /* порядок внутри колонки: сначала ручной (order), затем обычная сортировка */
+  function compareBoard(a, b) {
+    var ao = typeof a.order === 'number' ? a.order : null;
+    var bo = typeof b.order === 'number' ? b.order : null;
+    if (ao !== null && bo !== null && ao !== bo) return ao - bo;
+    if (ao !== null && bo === null) return -1;
+    if (ao === null && bo !== null) return 1;
+    return compareItems(a, b);
   }
 
   function prioBadge(p) {
@@ -761,7 +774,9 @@
 
   function cardHtml(item) {
     var pc = prio(item.priority);
-    return '<article class="card" draggable="true" data-drag-id="' + esc(item.id) + '" data-id="' + esc(item.id) + '" tabindex="0" style="--card-accent: var(--' + pc.id.toLowerCase() + ')">' +
+    return '<article class="card" data-id="' + esc(item.id) + '" tabindex="0" role="button" '
+      + 'aria-label="' + esc(item.title + ' — ' + statusOf(item.status).label) + '" '
+      + 'style="--card-accent: var(--' + pc.id.toLowerCase() + ')">' +
       '<div class="card-top">' + prioBadge(item.priority) +
         '<span class="card-id">' + esc(item.id) + '</span></div>' +
       '<span class="card-title">' + esc(item.title) + '</span>' +
@@ -805,25 +820,20 @@
 
     el.tableBody.innerHTML = list.map(rowHtml).join('');
 
-    var cols = state.ui.view === 'board' ? visibleBoardStatuses(list) : STATUSES;
-    el.board.style.gridTemplateColumns = 'repeat(' + Math.max(1, cols.length) + ', minmax(252px, 1fr))';
+    var cols = STATUSES;
+    el.board.style.gridTemplateColumns = 'repeat(' + cols.length + ', minmax(212px, 1fr))';
     el.board.innerHTML = cols.map(function (s) {
       var inCol = list.filter(function (i) { return i.status === s.id; });
+      inCol.sort(compareBoard);
       return '<section class="col" data-col-status="' + s.id + '">' +
         '<header class="col-head">' +
           '<span class="dot" style="color:var(--' + (s.id === 'new' ? 'accent' : 'p' + (1 + (s.order % 4))) + ')"></span>' +
           '<span class="name">' + esc(s.label) + '</span>' +
           '<span class="count">' + inCol.length + '</span>' +
         '</header>' +
-        '<div class="col-body">' + (inCol.length ? inCol.map(cardHtml).join('') : '<div class="col-empty" style="padding:6px 4px;font-size:12px;color:var(--muted-2)">пусто</div>') + '</div>' +
+        '<div class="col-body">' + (inCol.length ? inCol.map(cardHtml).join('') : '<div class="col-empty">перетащите сюда</div>') + '</div>' +
         '</section>';
     }).join('');
-  }
-
-  function visibleBoardStatuses(list) {
-    return STATUSES.filter(function (s) {
-      return list.some(function (i) { return i.status === s.id; }) || s.id === 'new' || s.id === 'progress';
-    });
   }
 
   function emptyMarkup() {
@@ -1497,6 +1507,221 @@
 
   /* ---------------------------------------------------------------- события */
 
+  /* ------------------------------------------------ канбан: перетаскивание */
+
+  var boardDrag = null;
+  var boardClickLock = false;
+
+  function effectiveOrder(list, index) {
+    var item = list[index];
+    if (!item) return null;
+    return typeof item.order === 'number' ? item.order : index + 1;
+  }
+
+  function boardColBody(col) {
+    return col ? col.querySelector('.col-body') : null;
+  }
+
+  function clearBoardDropMarks() {
+    if (el.board) $$('.col.is-drop', el.board).forEach(function (c) { c.classList.remove('is-drop'); });
+  }
+
+  function removeBoardDragArtifacts() {
+    if (boardDrag) {
+      if (boardDrag.ghost && boardDrag.ghost.parentNode) boardDrag.ghost.parentNode.removeChild(boardDrag.ghost);
+      if (boardDrag.placeholder && boardDrag.placeholder.parentNode) boardDrag.placeholder.parentNode.removeChild(boardDrag.placeholder);
+      if (boardDrag.card) boardDrag.card.classList.remove('is-dragging');
+    }
+    clearBoardDropMarks();
+    document.body.classList.remove('is-board-dragging');
+  }
+
+  function onBoardPointerDown(event) {
+    if (boardDrag) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    var card = event.target.closest ? event.target.closest('.card[data-id]') : null;
+    if (!card || !el.board.contains(card)) return;
+    if (!canWrite()) {
+      toast('Роль «только чтение»: перемещение недоступно', 'danger');
+      return;
+    }
+    boardDrag = {
+      pointerId: event.pointerId,
+      id: card.getAttribute('data-id'),
+      card: card,
+      startX: event.clientX,
+      startY: event.clientY,
+      offsetX: 0,
+      offsetY: 0,
+      active: false,
+      ghost: null,
+      placeholder: null,
+      col: null,
+      index: 0
+    };
+    document.addEventListener('pointermove', onBoardPointerMove, true);
+    document.addEventListener('pointerup', onBoardPointerUp, true);
+    document.addEventListener('pointercancel', onBoardPointerCancel, true);
+    document.addEventListener('keydown', onBoardPointerKey, true);
+  }
+
+  function activateBoardDrag() {
+    var rect = boardDrag.card.getBoundingClientRect();
+    boardDrag.offsetX = boardDrag.startX - rect.left;
+    boardDrag.offsetY = boardDrag.startY - rect.top;
+    boardDrag.active = true;
+    var ghost = boardDrag.card.cloneNode(true);
+    ghost.className = 'card drag-ghost';
+    ghost.removeAttribute('data-id');
+    ghost.removeAttribute('style');
+    ghost.style.width = Math.round(rect.width) + 'px';
+    document.body.appendChild(ghost);
+    boardDrag.ghost = ghost;
+    boardDrag.card.classList.add('is-dragging');
+    var placeholder = document.createElement('div');
+    placeholder.className = 'drop-placeholder';
+    boardDrag.placeholder = placeholder;
+    document.body.classList.add('is-board-dragging');
+  }
+
+  function moveGhost(x, y) {
+    if (!boardDrag || !boardDrag.ghost) return;
+    boardDrag.ghost.style.left = Math.round(x - boardDrag.offsetX) + 'px';
+    boardDrag.ghost.style.top = Math.round(y - boardDrag.offsetY) + 'px';
+  }
+
+  function updateBoardDropTarget(x, y) {
+    var node = document.elementFromPoint(x, y);
+    var col = node ? node.closest('[data-col-status]') : null;
+    if (!col) { clearBoardDropMarks(); boardDrag.col = null; return; }
+    boardDrag.col = col;
+    $$('.col', el.board).forEach(function (c) { c.classList.toggle('is-drop', c === col); });
+    var body = boardColBody(col);
+    if (!body || !boardDrag.placeholder) return;
+    var cards = $$('.card', body).filter(function (c) { return !c.classList.contains('is-dragging'); });
+    var index = cards.length;
+    for (var i = 0; i < cards.length; i++) {
+      var rect = cards[i].getBoundingClientRect();
+      if (y < rect.top + rect.height / 2) { index = i; break; }
+    }
+    boardDrag.index = index;
+    if (index < cards.length) body.insertBefore(boardDrag.placeholder, cards[index]);
+    else body.appendChild(boardDrag.placeholder);
+  }
+
+  function autoScrollBoard(x) {
+    var wrap = el.boardWrap;
+    if (!wrap) return;
+    var rect = wrap.getBoundingClientRect();
+    if (x < rect.left + 56) wrap.scrollLeft -= 20;
+    else if (x > rect.right - 56) wrap.scrollLeft += 20;
+  }
+
+  function onBoardPointerMove(event) {
+    if (!boardDrag || event.pointerId !== boardDrag.pointerId) return;
+    if (!boardDrag.active) {
+      if (Math.abs(event.clientX - boardDrag.startX) < 5 && Math.abs(event.clientY - boardDrag.startY) < 5) return;
+      activateBoardDrag();
+    }
+    if (event.cancelable) event.preventDefault();
+    moveGhost(event.clientX, event.clientY);
+    updateBoardDropTarget(event.clientX, event.clientY);
+    autoScrollBoard(event.clientX);
+  }
+
+  function onBoardPointerUp(event) {
+    if (!boardDrag || event.pointerId !== boardDrag.pointerId) return;
+    if (!boardDrag.active) { endBoardDrag(); return; }
+    var snapshot = { id: boardDrag.id, col: boardDrag.col, index: boardDrag.index };
+    endBoardDrag();
+    boardClickLock = true;
+    setTimeout(function () { boardClickLock = false; }, 250);
+    if (snapshot.col) applyBoardDrop(snapshot);
+  }
+
+  function onBoardPointerCancel() {
+    if (boardDrag) endBoardDrag();
+  }
+
+  function onBoardPointerKey(event) {
+    if (event.key === 'Escape' && boardDrag) {
+      event.preventDefault();
+      endBoardDrag();
+    }
+  }
+
+  function endBoardDrag() {
+    document.removeEventListener('pointermove', onBoardPointerMove, true);
+    document.removeEventListener('pointerup', onBoardPointerUp, true);
+    document.removeEventListener('pointercancel', onBoardPointerCancel, true);
+    document.removeEventListener('keydown', onBoardPointerKey, true);
+    removeBoardDragArtifacts();
+    boardDrag = null;
+  }
+
+  function applyBoardDrop(snapshot) {
+    var item = findItem(snapshot.id);
+    if (!item) return;
+    var targetStatus = snapshot.col.getAttribute('data-col-status');
+    var prevStatus = item.status;
+    var prevOrder = typeof item.order === 'number' ? item.order : null;
+    var body = boardColBody(snapshot.col);
+    if (!body) return;
+
+    var siblings = $$('.card', body)
+      .filter(function (c) { return !c.classList.contains('is-dragging'); })
+      .map(function (c) { return findItem(c.getAttribute('data-id')); })
+      .filter(function (s) { return s && s.id !== item.id; });
+
+    var index = Math.max(0, Math.min(snapshot.index, siblings.length));
+    var prev = index > 0 ? effectiveOrder(siblings, index - 1) : null;
+    var next = index < siblings.length ? effectiveOrder(siblings, index) : null;
+    var newOrder;
+    if (prev === null && next === null) newOrder = 1;
+    else if (prev === null) newOrder = next - 1;
+    else if (next === null) newOrder = prev + 1;
+    else newOrder = (prev + next) / 2;
+    if (!isFinite(newOrder)) newOrder = 1;
+
+    var statusChanged = prevStatus !== targetStatus;
+    if (!statusChanged && prevOrder === newOrder) return;
+
+    updateItem(item.id, {
+      status: targetStatus,
+      order: newOrder,
+      _historyText: statusChanged
+        ? 'Перемещено в «' + statusOf(targetStatus).label + '»'
+        : 'Изменён порядок в колонке'
+    }, true);
+
+    if (statusChanged) {
+      toast('«' + statusOf(prevStatus).label + '» → «' + statusOf(targetStatus).label + '»', 'ok', {
+        label: 'Отменить',
+        onClick: function () {
+          updateItem(item.id, { status: prevStatus, order: prevOrder, _historyText: 'Перемещение отменено' }, true);
+        }
+      });
+    }
+  }
+
+  function moveCardByKeyboard(card, delta) {
+    var item = findItem(card.getAttribute('data-id'));
+    if (!item) return;
+    var index = -1;
+    for (var i = 0; i < STATUSES.length; i++) if (STATUSES[i].id === item.status) index = i;
+    var nextStatus = STATUSES[index + delta];
+    if (!nextStatus) return;
+    updateItem(item.id, {
+      status: nextStatus.id,
+      order: null,
+      _historyText: 'Статус → ' + nextStatus.label + ' (с клавиатуры)'
+    }, true);
+    setTimeout(function () {
+      var again = $('.card[data-id="' + item.id + '"]', el.board);
+      if (again) again.focus();
+    }, 30);
+  }
+
   function bindEvents() {
     /* поиск */
     var searchTimer = null;
@@ -1576,56 +1801,26 @@
 
     /* канбан: клик + drag&drop */
     el.board.addEventListener('click', function (event) {
+      if (boardClickLock) { boardClickLock = false; return; }
       var card = event.target.closest('[data-id]');
       if (card && !card.classList.contains('is-dragging')) openDrawer(card.getAttribute('data-id'));
     });
     el.board.addEventListener('keydown', function (event) {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
       var card = event.target.closest('[data-id]');
       if (!card) return;
+      if ((event.ctrlKey || event.metaKey || event.altKey) &&
+          (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
+        if (!canWrite()) return;
+        event.preventDefault();
+        moveCardByKeyboard(card, event.key === 'ArrowRight' ? 1 : -1);
+        return;
+      }
+      if (event.key !== 'Enter' && event.key !== ' ') return;
       event.preventDefault();
       openDrawer(card.getAttribute('data-id'));
     });
 
-    var dragId = null;
-    el.board.addEventListener('dragstart', function (event) {
-      if (!canWrite()) { event.preventDefault(); return; }
-      var card = event.target.closest('[data-drag-id]');
-      if (!card) return;
-      dragId = card.getAttribute('data-drag-id');
-      card.classList.add('is-dragging');
-      if (event.dataTransfer) {
-        event.dataTransfer.effectAllowed = 'move';
-        try { event.dataTransfer.setData('text/plain', dragId); } catch (e) { /* ignore */ }
-      }
-    });
-    el.board.addEventListener('dragend', function () {
-      $$('.card.is-dragging', el.board).forEach(function (c) { c.classList.remove('is-dragging'); });
-      dragId = null;
-    });
-    el.board.addEventListener('dragover', function (event) {
-      var col = event.target.closest('[data-col-status]');
-      if (!col || !dragId) return;
-      event.preventDefault();
-      $$('.col', el.board).forEach(function (c) { c.classList.remove('is-drop'); });
-      col.classList.add('is-drop');
-    });
-    el.board.addEventListener('dragleave', function (event) {
-      var col = event.target.closest('[data-col-status]');
-      if (col && !col.contains(event.relatedTarget)) col.classList.remove('is-drop');
-    });
-    el.board.addEventListener('drop', function (event) {
-      var col = event.target.closest('[data-col-status]');
-      if (!col || !dragId) return;
-      event.preventDefault();
-      var item = findItem(dragId);
-      var target = col.getAttribute('data-col-status');
-      $$('.col', el.board).forEach(function (c) { c.classList.remove('is-drop'); });
-      if (item && item.status !== target) {
-        updateItem(item.id, { status: target, _historyText: 'Перемещено в «' + statusOf(target).label + '»' });
-      }
-      dragId = null;
-    });
+    el.board.addEventListener('pointerdown', onBoardPointerDown);
 
     /* пустые состояния */
     el.emptyState.addEventListener('click', function (event) {

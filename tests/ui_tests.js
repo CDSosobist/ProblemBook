@@ -8,6 +8,7 @@
 
   var PHASE = window.__PB_PHASE__ || 1;
   var results = { pass: 0, fail: 0, lines: [] };
+  var STATUS_COUNT = 7;   /* new, progress, blocked, review, done, deferred, rejected */
 
   function emit(line) {
     results.lines.push(line);
@@ -42,11 +43,24 @@
     node.dispatchEvent(new Event('change', { bubbles: true }));
     return true;
   }
-  function fireDrag(from, to) {
-    var dt = new DataTransfer();
-    from.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
-    to.dispatchEvent(new DragEvent('dragover', { bubbles: true, dataTransfer: dt }));
-    to.dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: dt }));
+  /* перетаскивание карточки мышью: pointerdown → pointermove → pointerup */
+  function pointerDrag(card, targetCol, yFactor) {
+    var from = card.getBoundingClientRect();
+    var to = targetCol.getBoundingClientRect();
+    var startX = Math.round(from.left + from.width / 2);
+    var startY = Math.round(from.top + from.height / 2);
+    var endX = Math.round(to.left + to.width / 2);
+    var endY = Math.round(to.top + to.height * (yFactor === undefined ? 0.6 : yFactor));
+    function fire(node, type, x, y) {
+      node.dispatchEvent(new PointerEvent(type, {
+        bubbles: true, cancelable: true, clientX: x, clientY: y,
+        pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0, buttons: 1
+      }));
+    }
+    fire(card, 'pointerdown', startX, startY);
+    fire(document, 'pointermove', startX + 20, startY + 20);
+    fire(document, 'pointermove', endX, endY);
+    fire(document, 'pointerup', endX, endY);
   }
   function blobSize(buttonId) {
     var captured = null;
@@ -167,15 +181,63 @@
     await sleep(220);
 
     /* 7. Канбан */
+    /* закрываем карточку проблемы: она перекрывает доску и backdrop перехватывает координаты */
+    if (q('#drawer').classList.contains('is-open')) {
+      q('#drawerClose').click();
+      await sleep(220);
+    }
+    ok('боковая панель закрыта перед работой с канбаном',
+      !q('#drawer').classList.contains('is-open'));
     q('#viewSwitch [data-view="board"]').click();
     await sleep(260);
     ok('канбан отрисован', !q('#boardView').hidden && q('#tableView').hidden &&
-      qa('#board .card').length === 1 && qa('#board .col').length >= 2,
-      'cards=' + qa('#board .card').length);
-    fireDrag(q('#board .card'), q('#board [data-col-status="new"]'));
+      qa('#board .card').length === 1, 'cards=' + qa('#board .card').length);
+    ok('на канбане все семь колонок', qa('#board .col').length === STATUS_COUNT,
+      String(qa('#board .col').length));
+
+    var statusBeforeDrag = items()[0].status;
+    pointerDrag(q('#board .card'), q('#board [data-col-status="review"]'));
+    await sleep(350);
+    ok('перетаскивание в «На проверке» меняет статус', items()[0].status === 'review', items()[0].status);
+    ok('карточка оказалась в целевой колонке',
+      qa('#board [data-col-status="review"] .card').length === 1,
+      String(qa('#board [data-col-status="review"] .card').length));
+    ok('порядок в колонке сохраняется числом', typeof items()[0].order === 'number', String(items()[0].order));
+    ok('перемещение записано в историю',
+      items()[0].history.some(function (h) { return h.text.indexOf('Перемещено') >= 0; }),
+      JSON.stringify(items()[0].history.map(function (h) { return h.text; })));
+    ok('есть уведомление с отменой перемещения', !!q('.toast button'));
+    q('.toast button').click();
+    await sleep(320);
+    ok('отмена возвращает прежний статус', items()[0].status === statusBeforeDrag,
+      items()[0].status + ' вместо ' + statusBeforeDrag);
+
+    var cardNow = q('#board .card');
+    cardNow.focus();
+    cardNow.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'ArrowRight', ctrlKey: true, bubbles: true, cancelable: true
+    }));
     await sleep(300);
-    ok('drag&drop меняет статус', items()[0].status === 'new' &&
-      qa('#board [data-col-status="new"] .card').length === 1, items()[0].status);
+    ok('с клавиатуры (Ctrl+→) статус меняется', items()[0].status !== statusBeforeDrag, items()[0].status);
+
+    /* доска шире экрана: прокручиваем вправо, как это сделал бы человек */
+    var boardWrap = q('#boardView .board-wrap');
+    boardWrap.scrollLeft = boardWrap.scrollWidth;
+    await sleep(180);
+    var doneCol = q('#board [data-col-status="done"]');
+    var doneRect = doneCol.getBoundingClientRect();
+    var probeEl = document.elementFromPoint(
+      Math.round(doneRect.left + doneRect.width / 2),
+      Math.round(doneRect.top + doneRect.height * 0.5));
+    ok('точка сброса попадает в колонку «Решена»',
+      !!(probeEl && probeEl.closest('[data-col-status="done"]')),
+      (probeEl && (probeEl.className || probeEl.tagName)) +
+        ' | rect ' + Math.round(doneRect.left) + ',' + Math.round(doneRect.top) +
+        ' ' + Math.round(doneRect.width) + 'x' + Math.round(doneRect.height) +
+        ' | viewport ' + window.innerWidth + 'x' + window.innerHeight);
+    pointerDrag(q('#board .card'), doneCol, 0.5);
+    await sleep(320);
+    ok('перетаскивание в «Решена» работает', items()[0].status === 'done', items()[0].status);
     q('#viewSwitch [data-view="table"]').click();
     await sleep(220);
 
@@ -240,11 +302,13 @@
 
     /* 12. Удаление и отмена */
     window.confirm = function () { return true; };
+    qa('.toast').forEach(function (node) { node.remove(); });
     q('#drawerDelete').click();
     await sleep(320);
     ok('удаление работает', items().length === 1, String(items().length));
     ok('есть тост с «Отменить»', !!q('.toast button'));
-    q('.toast button').click();
+    var toastButtons = qa('.toast button');
+    toastButtons[toastButtons.length - 1].click();
     await sleep(320);
     ok('undo восстанавливает запись', items().length === 2, String(items().length));
 
