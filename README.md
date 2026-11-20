@@ -217,6 +217,7 @@ tests/run_ui_tests.py   запуск тестов интерфейса в headle
 tests/server_test.py    тесты API и TLS
 tests/server_ui_test.py тест интерфейса в серверном режиме
 serve.sh                локальный статический сервер
+scripts/expose-network.sh  открыть SSH/RDP/проблембук из локальной сети (нужен root)
 docs/screenshot.png     скриншот с демо-данными
 docs/edr-selection.md   критерии выбора EDR: стоп-условия, требования, вопросы вендору, матрица оценки
 docs/edr-rfi-letter.md  шаблон письма вендорам для запроса предложений по EDR
